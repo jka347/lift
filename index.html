@@ -98,11 +98,8 @@
   .lastline{color:var(--dim); font-size:14px; margin-top:6px;}
   .lastline b{color:var(--text); font-weight:600;}
   .weightrow{display:flex; align-items:center; gap:10px; margin-top:12px;}
-  .weightrow .val{flex:1; text-align:center; font-size:26px; font-weight:700; cursor:pointer;
-    border-radius:10px; padding:4px 0; user-select:none;}
-  .weightrow .val:active{background:var(--card2);}
+  .weightrow .val{flex:1; text-align:center; font-size:26px; font-weight:700; padding:4px 0; user-select:none;}
   .weightrow .val small{font-size:14px; color:var(--dim); font-weight:400;}
-  .weightrow .val small .halfstep{color:var(--accent);}
   .step{background:var(--card2); border:1px solid var(--line); color:var(--text); border-radius:12px;
     font-size:26px; font-weight:600; width:64px; height:52px; cursor:pointer; flex:none;}
   .step:active{background:var(--line);}
@@ -185,10 +182,15 @@ const API = 'https://api.github.com';
 
 // Default program used only to seed the gist on very first run.
 // The live program is always the data in the gist (editable in Settings).
+// Weights Jeff actually owns: free weights 5/10/12, then the adjustable set
+// (X, X+2.5, X+5 per 10-lb block from 15 to 90). 0 = bodyweight.
+const DEFAULT_WEIGHTS = [0, 5, 10, 12, 15, 17.5, 20, 25, 27.5, 30, 35, 37.5, 40,
+  45, 47.5, 50, 55, 57.5, 60, 65, 67.5, 70, 75, 77.5, 80, 85, 87.5, 90];
+
 const DEFAULT_DATA = {
   version: 1,
   updated_at: null,
-  settings: { units: 'lb' },
+  settings: { units: 'lb', weights: DEFAULT_WEIGHTS },
   program: { days: [
     { id:'upperA', name:'Upper A — Chest & Shoulders', exercises:[
       { id:'bench',    startWeight:45, name:'DB Bench Press',              sets:4, repLow:6,  repHigh:10, perSide:false, superset:null, rest:150 },
@@ -276,7 +278,35 @@ function ensureFormGuides(){
       if(ex.rest == null && defEx.rest != null){ ex.rest = defEx.rest; changed = true; }
     }
   }
+  if(!Array.isArray(data.settings.weights) || !data.settings.weights.length){
+    data.settings.weights = DEFAULT_WEIGHTS;
+    changed = true;
+  }
   return changed;
+}
+
+/* ============ weight ladder ============ */
+function weightLadder(){
+  const w = data && data.settings && data.settings.weights;
+  return (Array.isArray(w) && w.length) ? w : DEFAULT_WEIGHTS;
+}
+// Next/previous weight that exists in the ladder; off-ladder values snap.
+function nextWeight(w){
+  for(const v of weightLadder()) if(v > w + 0.01) return v;
+  return w;
+}
+function prevWeight(w){
+  let p = null;
+  for(const v of weightLadder()){ if(v < w - 0.01) p = v; else break; }
+  return p == null ? w : p;
+}
+// Progression suggestion: below 20 lb climb one owned step (10→12, 15→17.5);
+// from 20 up, jump +5 snapped up to an owned weight (20→25, 25→30, 47.5→55).
+function progressWeight(w){
+  if(w < 20) return nextWeight(w);
+  const target = w + 5;
+  for(const v of weightLadder()) if(v >= target - 0.01) return v;
+  return nextWeight(w);
 }
 
 /* ============ storage helpers ============ */
@@ -512,7 +542,7 @@ function computePrefill(ex, excludeSession){
   }
   const progressed = last.reps.length >= ex.sets && Math.min(...last.reps) >= ex.repHigh;
   if(progressed){
-    return { weight: last.weight + 5, reps: Array(ex.sets).fill(ex.repLow), progressed: true, last };
+    return { weight: progressWeight(last.weight), reps: Array(ex.sets).fill(ex.repLow), progressed: true, last };
   }
   const reps = Array.from({length: ex.sets}, (_, i) => last.reps[i] != null ? last.reps[i] : last.reps[last.reps.length-1]);
   return { weight: last.weight, reps, progressed: false, last };
@@ -654,7 +684,7 @@ function renderOverview(){
       if(last){
         weight.innerHTML = esc(last.weight) + ' <small>' + esc(data.settings.units) + '</small>';
         const progressed = last.reps.length >= ex.sets && Math.min(...last.reps) >= ex.repHigh;
-        if(progressed) weight.appendChild(el('span','next','⬆ ' + (last.weight + 5) + ' next'));
+        if(progressed) weight.appendChild(el('span','next','⬆ ' + progressWeight(last.weight) + ' next'));
       }else{
         weight.className = 'ovweight start';
         weight.textContent = 'start: ' + ex.startWeight;
@@ -785,20 +815,17 @@ function exerciseCard(day, ex, ws){
   }
   card.appendChild(lastLine);
 
-  // weight stepper — tap the number to toggle ±5 / ±2.5
+  // weight stepper — steps through the weights you actually own
   const wrow = el('div','weightrow');
   const wminus = el('button','step','−');
   const wval = el('div','val');
   const wplus = el('button','step','+');
-  let wstep = 5;
   function paintWeight(){
-    const stepTag = wstep === 5 ? '± 5' : '<span class="halfstep">± 2.5</span>';
-    wval.innerHTML = esc(state.weight) + ' <small>' + esc(data.settings.units) + ' · ' + stepTag + '</small>';
+    wval.innerHTML = esc(state.weight) + ' <small>' + esc(data.settings.units) + '</small>';
   }
   paintWeight();
-  wval.onclick = () => { wstep = wstep === 5 ? 2.5 : 5; paintWeight(); };
-  wminus.onclick = () => { state.weight = Math.max(0, state.weight - wstep); paintWeight(); commit(); };
-  wplus.onclick = () => { state.weight += wstep; paintWeight(); commit(); };
+  wminus.onclick = () => { state.weight = prevWeight(state.weight); paintWeight(); commit(); };
+  wplus.onclick = () => { state.weight = nextWeight(state.weight); paintWeight(); commit(); };
   wrow.appendChild(wminus); wrow.appendChild(wval); wrow.appendChild(wplus);
   card.appendChild(wrow);
 
@@ -908,6 +935,32 @@ function renderSettings(){
   // --- data ---
   $view.appendChild(el('h2', null, 'Data'));
   $view.appendChild(el('div','status')).innerHTML = 'Units: <b>' + esc(data ? data.settings.units : 'lb') + '</b>';
+
+  const wField = el('div','field');
+  wField.style.marginTop = '14px';
+  wField.appendChild(el('label', null, 'Available weights (lb, comma-separated) — steppers and progression only use these'));
+  const wInput = el('input');
+  wInput.type = 'text';
+  wInput.value = weightLadder().join(', ');
+  const wErr = el('div','err');
+  const wBtn = el('button','btn secondary','Save weights');
+  wBtn.style.marginTop = '10px';
+  wBtn.onclick = () => {
+    const parts = wInput.value.split(',').map(s => s.trim()).filter(s => s !== '');
+    const nums = parts.map(Number);
+    if(!nums.length || nums.some(n => isNaN(n) || n < 0)){
+      wErr.style.color = '';
+      wErr.textContent = 'Numbers ≥ 0 only, separated by commas.';
+      return;
+    }
+    data.settings.weights = [...new Set(nums)].sort((a,b) => a - b);
+    wInput.value = data.settings.weights.join(', ');
+    scheduleSave();
+    wErr.style.color = 'var(--accent)';
+    wErr.textContent = 'Saved ✓';
+  };
+  wField.appendChild(wInput); wField.appendChild(wBtn); wField.appendChild(wErr);
+  $view.appendChild(wField);
   const exportBtn = el('button','btn secondary','Export JSON');
   exportBtn.style.marginTop = '10px';
   exportBtn.onclick = () => {
