@@ -69,6 +69,16 @@
   .badge{background:var(--accent-dim); color:var(--accent); font-size:12px; font-weight:700;
     padding:3px 9px; border-radius:999px; white-space:nowrap;}
   .target{color:var(--dim); font-size:14px; margin-top:2px;}
+  .infobtn{background:none; border:1px solid var(--line); color:var(--dim); border-radius:50%;
+    width:30px; height:30px; font-size:15px; font-style:italic; font-family:Georgia,serif;
+    cursor:pointer; flex:none; margin-left:auto; line-height:1;}
+  .infobtn.open{background:var(--accent-dim); color:var(--accent); border-color:var(--accent-dim);}
+  .formbox{display:none; background:var(--card2); border:1px solid var(--line); border-radius:10px;
+    padding:11px 13px; margin-top:10px; font-size:14px; line-height:1.5;}
+  .formbox.open{display:block;}
+  .formbox .how{color:var(--dim); margin:0 0 8px;}
+  .formbox ul{margin:0; padding-left:18px;}
+  .formbox li{margin-bottom:4px;}
   .lastline{color:var(--dim); font-size:14px; margin-top:6px;}
   .lastline b{color:var(--text); font-weight:600;}
   .weightrow{display:flex; align-items:center; gap:10px; margin-top:12px;}
@@ -89,9 +99,13 @@
   .ministep{background:var(--card); border:1px solid var(--line); color:var(--text); border-radius:9px;
     font-size:20px; width:44px; height:44px; cursor:pointer; flex:none;}
   .ministep:active{background:var(--line);}
-  .donebtn{display:block; width:100%; margin-top:12px; padding:13px; font-size:16px; font-weight:700;
+  .btnrow{display:flex; gap:8px; margin-top:12px;}
+  .donebtn{flex:1; padding:13px; font-size:16px; font-weight:700;
     border-radius:12px; border:1px solid var(--line); background:var(--card2); color:var(--text); cursor:pointer;}
   .donebtn.on{background:var(--accent-dim); color:var(--accent); border-color:var(--accent-dim);}
+  .clearbtn{padding:13px 16px; font-size:14px; border-radius:12px; border:1px solid var(--line);
+    background:none; color:var(--dim); cursor:pointer; flex:none;}
+  .clearbtn:active{background:var(--card2);}
 
   /* Settings / setup */
   .field{margin-bottom:18px;}
@@ -185,6 +199,55 @@ const DEFAULT_DATA = {
   ]},
   sessions: []
 };
+
+// Form guide (from the program PDF), keyed by exercise id and merged into the
+// program data — seeded into new gists and back-filled into existing ones.
+const FORM_GUIDE = (() => {
+  const bench = { how:'Lie on the bench, a dumbbell in each hand at chest level, elbows ~45° from your torso. Press to extension over your chest, then lower under control until you feel a stretch.', cues:['Wrists stacked over elbows; don’t flare elbows straight out','Shoulder blades pulled back and down into the bench','Control the lower — that’s where much of the work is'] };
+  const press = { how:'Dumbbells at shoulder height, palms forward. Press straight overhead to extension, then lower under control. Seated against the bench back is stricter and more delt.', cues:['Ribs down, abs braced — don’t arch the lower back','Finish over the crown of your head, not out front','No shrugging; shoulders stay down away from the ears'] };
+  const row = { how:'Hand and knee on the bench, opposite foot on the floor, back flat and parallel to the ground. Let the dumbbell hang, then pull it to your hip by driving the elbow back.', cues:['Pause and squeeze the shoulder blade at the top','Pull to your hip, not your armpit','Back flat and still; no torso twist to heave the weight'] };
+  const curl = { how:'Dumbbells at your sides, palms forward. Curl by bending the elbows, upper arms pinned to your sides. Lower slowly to full extension.', cues:['No swinging — elbows glued to your ribs','Control the lowering; full range both directions'] };
+  const rdl = { how:'Dumbbell in each hand in front of your thighs, feet hip-width, soft knees. Push hips backward (not down), weights sliding close to your legs to a mid-shin hamstring stretch. Drive hips forward, squeeze glutes.', cues:['Hip movement, not a squat — knees stay fixed','Keep the dumbbells close; drifting forward strains the low back','Back flat, never rounded — if it rounds, stop higher'] };
+  return {
+    bench, bench2: bench, ohp: press, seatpress: press, row, rowheavy: row, curl, curl2: curl, rdl, rdlheavy: rdl,
+    incline: { how:'Bench propped to ~30–45°. Press from upper-chest level to extended over your upper chest, lowering with control to a deep stretch.', cues:['Elbows ~45° from torso, wrists stacked','Don’t go too steep — that turns it into a shoulder press'] },
+    latraise: { how:'Dumbbells at your sides, slight elbow bend. Raise out to the sides to shoulder height, leading with the elbows, then lower slowly.', cues:['Go light — the most over-loaded, worst-performed lift in the gym','No swinging or shrugging; pinkies slightly up at the top','The slow lowering is half the exercise'] },
+    triext: { how:'Both hands cupping one dumbbell overhead. Lower it behind your head bending only at the elbows; extend back up. The bottom stretch is the point.', cues:['Elbows point forward, tucked near the ears — no flaring','Only the forearms move'] },
+    hammer: { how:'Same as a curl but palms face each other the whole rep — hits brachialis and forearms.', cues:['Elbows pinned to your sides; no swing','Can go slightly heavier than regular curls'] },
+    csrow: { how:'Lie chest-down on the inclined bench, arms hanging. Row both dumbbells up by driving elbows back, squeezing shoulder blades; lower slow.', cues:['Chest stays glued to the pad — if it lifts, the weight is too heavy','Pause a beat at the top with blades pinched'] },
+    pullover: { how:'On the bench, both hands cupping one dumbbell over your chest. Slight elbow bend; lower in an arc back over your head to a deep lat/chest stretch, then pull back over.', cues:['The stretch position is the point — go slow there, don’t bounce','Ribs down, lower back stays on the bench'] },
+    reardelt: { how:'Hinge forward (or chest on the incline bench), light dumbbells hanging. Slight elbow bend; raise out to the sides like spreading wings, lower slow.', cues:['Very light, high reps — momentum ruins it instantly','Lead with the elbows; don’t fully squeeze the blades (keeps it on the delts)'] },
+    skull: { how:'Lie on the bench, dumbbells pressed over your chest, palms facing each other. Bending only at the elbows, lower beside your head, then extend back up.', cues:['Upper arms vertical and still; elbows in, not flared','Lower with control — the name is a warning, not a technique'] },
+    goblet: { how:'One dumbbell held vertically against your chest. Stance wider than shoulders, toes out ~30°. Sit straight down between your legs, knees out over toes; drive up through heels and midfoot.', cues:['Knees track out over the toes — never caving inward','Chest tall, torso upright','Pain-free depth only; tempo and pauses before load if the knee complains'] },
+    kbswing: { how:'Feet a bit wider than shoulders. Hinge (hips back, soft knees), hike the bell between your legs, then snap the hips forward — the bell floats to chest height from hip power.', cues:['It’s a hinge, not a squat — shins stay near vertical','Arms are ropes; the hips are the engine','Flat back; brace at the top like a standing plank'] },
+    wsitup: { how:'Knees bent, feet anchored, dumbbell held against your chest. Sit up under control, lower slowly. Treat it like a lift.', cues:['Slow lowering — that’s where the growth is','Weight on the chest, not behind the head','When 15 gets easy, add weight, not reps'] },
+    legraise: { how:'Lie on the bench, hands gripping behind your head or under hips. Raise legs to vertical, then lower slowly to just below bench level.', cues:['Lower back stays pressed down; shorten the range if it arches','Slow down, controlled up; add ankle weight to progress'] },
+    hipthrust: { how:'Upper back on the bench edge, feet flat, dumbbell across your hips (towel under it). Drive through heels to lift hips level, squeeze glutes hard, lower with control.', cues:['Chin tucked, ribs down — finish with glutes, not a low-back arch','Shins roughly vertical at the top; adjust foot distance'] },
+    tgu: { how:'KB pressed up in one hand: roll to the opposite elbow → hand → lift hips → sweep the leg back to a kneeling lunge → stand. Reverse exactly. Eyes on the bell the whole time.', cues:['Slow is the point — each position is a checkpoint','Folded towel under the knee; skip if it aggravates it','Learn light — a shoe balanced on your fist works'] },
+    twist: { how:'Seated, leaning back slightly, knees bent (heels down = easier). Hold the KB at your chest and rotate the torso side to side under control.', cues:['Rotate from the torso, not the arms','Slow beats fast; touching the floor is optional'] },
+    carry: { how:'One heavy dumbbell at your side, arm straight — a loaded suitcase. Walk or stand dead upright, shoulders level, 30 sec per side.', cues:['Go heavy (45+ lb) — light carries do nothing','Don’t lean away from the weight'] }
+  };
+})();
+
+for(const day of DEFAULT_DATA.program.days)
+  for(const ex of day.exercises)
+    if(FORM_GUIDE[ex.id]) ex.form = FORM_GUIDE[ex.id];
+
+// Back-fill form guides into a program that predates them (matched by day+exercise id).
+function ensureFormGuides(){
+  if(!data || !data.program) return false;
+  let changed = false;
+  for(const day of data.program.days){
+    const defDay = DEFAULT_DATA.program.days.find(d => d.id === day.id);
+    if(!defDay) continue;
+    for(const ex of day.exercises){
+      if(ex.form) continue;
+      const defEx = defDay.exercises.find(e => e.id === ex.id);
+      if(defEx && defEx.form){ ex.form = defEx.form; changed = true; }
+    }
+  }
+  return changed;
+}
 
 /* ============ storage helpers ============ */
 const store = {
@@ -349,6 +412,7 @@ async function hydrate(){
     store.baseline = remote.updated_at || null;
     persistLocal();
   }
+  if(ensureFormGuides()){ persistLocal(); scheduleSave(); }
 }
 
 function askConflict(){
@@ -418,6 +482,15 @@ function writeEntry(dayId, ex, weight, reps, done){
   e.weight = weight;
   e.reps = reps.filter(r => r != null);
   if(done) e.done = true; else delete e.done;
+  scheduleSave();
+}
+
+function removeEntry(dayId, exId){
+  const s = workingSession(dayId);
+  if(!s) return;
+  const i = s.entries.findIndex(e => e.exerciseId === exId);
+  if(i >= 0) s.entries.splice(i, 1);
+  if(!s.entries.length) data.sessions.splice(data.sessions.indexOf(s), 1);
   scheduleSave();
 }
 
@@ -559,6 +632,25 @@ function exerciseCard(day, ex, ws){
   const targetReps = ex.repLow === ex.repHigh ? String(ex.repLow) : ex.repLow + '–' + ex.repHigh;
   card.appendChild(el('div','target', ex.sets + ' × ' + targetReps + (unit === 'sec' ? ' sec' : '')));
 
+  // expandable form guide
+  if(ex.form && ex.form.how){
+    const info = el('button','infobtn','i');
+    info.setAttribute('aria-label','Form guide');
+    name.appendChild(info);
+    const box = el('div','formbox');
+    box.appendChild(el('p','how', ex.form.how));
+    if(Array.isArray(ex.form.cues) && ex.form.cues.length){
+      const ul = el('ul');
+      for(const c of ex.form.cues) ul.appendChild(el('li', null, c));
+      box.appendChild(ul);
+    }
+    card.appendChild(box);
+    info.onclick = () => {
+      box.classList.toggle('open');
+      info.classList.toggle('open');
+    };
+  }
+
   const lastLine = el('div','lastline');
   if(pre.last){
     lastLine.innerHTML = 'Last: <b>' + esc(pre.last.weight) + ' ' + esc(data.settings.units) + '</b> — ' + esc(pre.last.reps.join('/'));
@@ -594,7 +686,11 @@ function exerciseCard(day, ex, ws){
     const rep = el('span','rep');
     const plus = el('button','ministep','+');
     repEls.push(rep);
-    minus.onclick = () => { state.reps[i] = state.reps[i] == null ? ex.repLow : Math.max(0, state.reps[i] - repStep); paintRep(i); commit(); };
+    minus.onclick = () => {
+      // stepping below 0 blanks the set again
+      state.reps[i] = state.reps[i] == null ? ex.repLow : (state.reps[i] - repStep < 0 ? null : state.reps[i] - repStep);
+      paintRep(i); commit();
+    };
     plus.onclick = () => { state.reps[i] = state.reps[i] == null ? ex.repLow : state.reps[i] + repStep; paintRep(i); commit(); };
     cell.appendChild(minus); cell.appendChild(rep); cell.appendChild(plus);
     grid.appendChild(cell);
@@ -606,7 +702,8 @@ function exerciseCard(day, ex, ws){
   for(let i = 0; i < ex.sets; i++) paintRep(i);
   card.appendChild(grid);
 
-  // done toggle
+  // done toggle + clear (removes today's entry, e.g. after an accidental tap)
+  const btnrow = el('div','btnrow');
   const doneBtn = el('button','donebtn' + (state.done ? ' on' : ''), state.done ? '✓ Done' : 'Mark done');
   doneBtn.onclick = () => {
     state.done = !state.done;
@@ -617,7 +714,10 @@ function exerciseCard(day, ex, ws){
     card.classList.toggle('done', state.done);
     commit(true);
   };
-  card.appendChild(doneBtn);
+  const clearBtn = el('button','clearbtn','Clear');
+  clearBtn.onclick = () => { removeEntry(day.id, ex.id); render(); };
+  btnrow.appendChild(doneBtn); btnrow.appendChild(clearBtn);
+  card.appendChild(btnrow);
 
   function commit(fromDone){
     state.touched = true;
@@ -781,7 +881,11 @@ async function init(){
   offline = !navigator.onLine;
 
   if(!store.pat){
-    if(data){ go('home'); showBanner('No GitHub token on this device — logging works locally. Add a token in Settings to sync.'); }
+    if(data){
+      if(ensureFormGuides()) persistLocal();
+      go('home');
+      showBanner('No GitHub token on this device — logging works locally. Add a token in Settings to sync.');
+    }
     else go('setup');
     return;
   }
