@@ -43,6 +43,19 @@
     font-size:19px; font-weight:600; cursor:pointer;}
   .daybtn:active{background:var(--card2);}
   .daybtn .last{display:block; font-size:14px; font-weight:400; color:var(--dim); margin-top:4px;}
+  .overviewbtn{display:block; width:100%; text-align:center; background:none; border:1px dashed var(--line);
+    color:var(--dim); border-radius:16px; padding:14px; font-size:15px; cursor:pointer; margin-top:4px;}
+  .overviewbtn:active{background:var(--card);}
+
+  /* Overview */
+  .ovrow{display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--card);
+    border:1px solid var(--line); border-radius:12px; padding:11px 14px; margin-bottom:8px;}
+  .ovname{font-size:15px; min-width:0;}
+  .ovname .sub{display:block; font-size:12px; color:var(--dim); margin-top:1px;}
+  .ovweight{font-size:18px; font-weight:700; white-space:nowrap; text-align:right;}
+  .ovweight small{font-size:12px; color:var(--dim); font-weight:400;}
+  .ovweight .next{display:block; font-size:12px; color:var(--accent); font-weight:600;}
+  .ovweight.start{color:var(--dim); font-weight:400; font-size:15px;}
 
   /* Session */
   .ssgroup{border:1px solid var(--accent-dim); border-radius:18px; padding:8px; margin-bottom:14px; position:relative;}
@@ -59,8 +72,11 @@
   .lastline{color:var(--dim); font-size:14px; margin-top:6px;}
   .lastline b{color:var(--text); font-weight:600;}
   .weightrow{display:flex; align-items:center; gap:10px; margin-top:12px;}
-  .weightrow .val{flex:1; text-align:center; font-size:26px; font-weight:700;}
+  .weightrow .val{flex:1; text-align:center; font-size:26px; font-weight:700; cursor:pointer;
+    border-radius:10px; padding:4px 0; user-select:none;}
+  .weightrow .val:active{background:var(--card2);}
   .weightrow .val small{font-size:14px; color:var(--dim); font-weight:400;}
+  .weightrow .val small .halfstep{color:var(--accent);}
   .step{background:var(--card2); border:1px solid var(--line); color:var(--text); border-radius:12px;
     font-size:26px; font-weight:600; width:64px; height:52px; cursor:pointer; flex:none;}
   .step:active{background:var(--line);}
@@ -91,6 +107,12 @@
   .status b{color:var(--text);}
   .note{font-size:14px; color:var(--dim); line-height:1.5; margin-bottom:16px;}
   .err{color:var(--danger); font-size:14px; margin-top:8px; min-height:1em;}
+  .steps{padding-left:22px; color:var(--dim); font-size:14px; line-height:1.65; margin:0 0 18px;}
+  .steps li{margin-bottom:6px;}
+  .steps a{color:var(--accent);}
+  .steps b{color:var(--text);}
+  .tokenhint{font-size:13px; color:var(--dim); margin-top:8px; line-height:1.5;}
+  .tokenhint a{color:var(--accent);}
   h2{font-size:16px; color:var(--dim); font-weight:600; text-transform:uppercase; letter-spacing:1px;
     margin:26px 0 10px;}
 
@@ -437,6 +459,7 @@ function render(){
   if(currentView === 'setup') renderSetup();
   else if(currentView === 'session') renderSession();
   else if(currentView === 'settings') renderSettings();
+  else if(currentView === 'overview') renderOverview();
   else renderHome();
   updateSyncDot();
 }
@@ -452,6 +475,38 @@ function renderHome(){
     b.appendChild(el('span','last', last ? 'Last: ' + fmtDate(last) : 'Never done'));
     b.onclick = () => go('session', day.id);
     $view.appendChild(b);
+  }
+  const ov = el('button','overviewbtn','Current weights →');
+  ov.onclick = () => go('overview');
+  $view.appendChild(ov);
+}
+
+function renderOverview(){
+  $title.textContent = 'Current weights';
+  for(const day of data.program.days){
+    $view.appendChild(el('h2', null, day.name));
+    for(const ex of day.exercises){
+      const row = el('div','ovrow');
+      const name = el('div','ovname', ex.name + (ex.perSide ? ' / side' : ''));
+      const last = lastEntryFor(ex.id, null);
+      const lastDate = (() => {
+        const sorted = [...data.sessions].sort((a,b) => a.date < b.date ? 1 : -1);
+        const s = sorted.find(s => s.entries.some(e => e.exerciseId === ex.id && e.reps && e.reps.length));
+        return s ? s.date : null;
+      })();
+      name.appendChild(el('span','sub', lastDate ? 'Last done ' + fmtDate(lastDate) : 'Not done yet'));
+      const weight = el('div','ovweight');
+      if(last){
+        weight.innerHTML = esc(last.weight) + ' <small>' + esc(data.settings.units) + '</small>';
+        const progressed = last.reps.length >= ex.sets && Math.min(...last.reps) >= ex.repHigh;
+        if(progressed) weight.appendChild(el('span','next','⬆ ' + (last.weight + 5) + ' next'));
+      }else{
+        weight.className = 'ovweight start';
+        weight.textContent = 'start: ' + ex.startWeight;
+      }
+      row.appendChild(name); row.appendChild(weight);
+      $view.appendChild(row);
+    }
   }
 }
 
@@ -512,15 +567,20 @@ function exerciseCard(day, ex, ws){
   }
   card.appendChild(lastLine);
 
-  // weight stepper
+  // weight stepper — tap the number to toggle ±5 / ±2.5
   const wrow = el('div','weightrow');
   const wminus = el('button','step','−');
   const wval = el('div','val');
   const wplus = el('button','step','+');
-  function paintWeight(){ wval.innerHTML = esc(state.weight) + ' <small>' + esc(data.settings.units) + '</small>'; }
+  let wstep = 5;
+  function paintWeight(){
+    const stepTag = wstep === 5 ? '± 5' : '<span class="halfstep">± 2.5</span>';
+    wval.innerHTML = esc(state.weight) + ' <small>' + esc(data.settings.units) + ' · ' + stepTag + '</small>';
+  }
   paintWeight();
-  wminus.onclick = () => { state.weight = Math.max(0, state.weight - 5); paintWeight(); commit(); };
-  wplus.onclick = () => { state.weight += 5; paintWeight(); commit(); };
+  wval.onclick = () => { wstep = wstep === 5 ? 2.5 : 5; paintWeight(); };
+  wminus.onclick = () => { state.weight = Math.max(0, state.weight - wstep); paintWeight(); commit(); };
+  wplus.onclick = () => { state.weight += wstep; paintWeight(); commit(); };
   wrow.appendChild(wminus); wrow.appendChild(wval); wrow.appendChild(wplus);
   card.appendChild(wrow);
 
@@ -609,7 +669,9 @@ function renderSettings(){
       patBtn.disabled = false; patBtn.textContent = 'Save token & reconnect';
     }
   };
-  patField.appendChild(patLabel); patField.appendChild(patInput); patField.appendChild(patBtn); patField.appendChild(patErr);
+  const patHint = el('div','tokenhint');
+  patHint.innerHTML = 'Need a new one? <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token</a> — under <b>Account permissions</b> set <b>Gists</b> to Read and write. No repository access needed.';
+  patField.appendChild(patLabel); patField.appendChild(patInput); patField.appendChild(patBtn); patField.appendChild(patErr); patField.appendChild(patHint);
   $view.appendChild(patField);
 
   const syncNow = el('button','btn secondary','Sync now');
@@ -675,8 +737,16 @@ function validateProgram(prog){
 function renderSetup(extraMsg){
   $title.textContent = 'Lift — Setup';
   $view.appendChild(el('p','note',
-    'One-time setup on this device: paste a fine-grained GitHub token with only the Gists permission (read & write). ' +
-    'The app stores your workout data in a private gist and the token only in this browser.'));
+    'One-time setup on this device. Your workout data lives in a private gist on your own GitHub account; ' +
+    'the token is stored only in this browser. Free GitHub account is all you need.'));
+  const steps = el('ol','steps');
+  steps.innerHTML =
+    '<li>Sign in to GitHub, then open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a></li>' +
+    '<li>Token name: anything (e.g. <b>lift</b>). Expiration: up to 1 year — the app will ask again when it expires.</li>' +
+    '<li>Repository access: leave as <b>Public repositories (read-only)</b>. No repo access is needed.</li>' +
+    '<li>Scroll down to <b>Account permissions</b> (not the repository list) → <b>Gists</b> → set to <b>Read and write</b>.</li>' +
+    '<li>Generate the token, copy it, and paste it below.</li>';
+  $view.appendChild(steps);
   if(extraMsg) $view.appendChild(el('p','err', extraMsg));
   const input = el('input');
   input.type = 'password';
