@@ -146,6 +146,17 @@
   h2{font-size:16px; color:var(--dim); font-weight:600; text-transform:uppercase; letter-spacing:1px;
     margin:26px 0 10px;}
 
+  /* rest timer */
+  #restbar{position:fixed; left:0; right:0; bottom:0; z-index:20; display:flex; align-items:center;
+    justify-content:center; gap:14px; padding:14px 16px calc(env(safe-area-inset-bottom) + 14px);
+    background:var(--card2); border-top:1px solid var(--line); cursor:pointer; user-select:none;}
+  #restbar .lbl{color:var(--dim); font-size:15px;}
+  #restbar b{font-size:26px; font-variant-numeric:tabular-nums;}
+  #restbar .hint{color:var(--dim); font-size:12px;}
+  #restbar.done{background:var(--accent-dim); border-top-color:var(--accent-dim);}
+  #restbar.done b, #restbar.done .lbl{color:var(--accent);}
+  body.resting main{padding-bottom:calc(env(safe-area-inset-bottom) + 120px);}
+
   /* modal */
   #modal{position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:50; display:flex;
     align-items:center; justify-content:center; padding:24px;}
@@ -163,6 +174,7 @@
 </header>
 <div id="banner" class="hidden"><span id="bannerText"></span><button id="bannerClose" aria-label="Dismiss">×</button></div>
 <main id="view"></main>
+<div id="restbar" class="hidden"><span class="lbl">Rest</span><b id="restTime">1:30</b><span class="hint">tap to dismiss</span></div>
 
 <script>
 'use strict';
@@ -179,7 +191,7 @@ const DEFAULT_DATA = {
   settings: { units: 'lb' },
   program: { days: [
     { id:'upperA', name:'Upper A — Chest & Shoulders', exercises:[
-      { id:'bench',    startWeight:45, name:'DB Bench Press',              sets:4, repLow:6,  repHigh:10, perSide:false, superset:null },
+      { id:'bench',    startWeight:45, name:'DB Bench Press',              sets:4, repLow:6,  repHigh:10, perSide:false, superset:null, rest:150 },
       { id:'ohp',      startWeight:20, name:'DB Overhead Press',           sets:3, repLow:8,  repHigh:12, perSide:false, superset:null },
       { id:'incline',  startWeight:35, name:'Incline DB Bench',            sets:3, repLow:8,  repHigh:12, perSide:false, superset:'ss1' },
       { id:'row',      startWeight:45, name:'One-Arm Row',                 sets:3, repLow:8,  repHigh:12, perSide:true,  superset:'ss1' },
@@ -189,7 +201,7 @@ const DEFAULT_DATA = {
       { id:'hammer',   startWeight:25, name:'Hammer Curls',                sets:3, repLow:10, repHigh:12, perSide:false, superset:'ss3' }
     ]},
     { id:'upperB', name:'Upper B — Back & Arms', exercises:[
-      { id:'rowheavy',  startWeight:50, name:'One-Arm Row (heavy)',  sets:4, repLow:6,  repHigh:10, perSide:true },
+      { id:'rowheavy',  startWeight:50, name:'One-Arm Row (heavy)',  sets:4, repLow:6,  repHigh:10, perSide:true, rest:150 },
       { id:'bench2',    startWeight:40, name:'DB Bench Press',       sets:3, repLow:8,  repHigh:12 },
       { id:'csrow',     startWeight:30, name:'Chest-Supported Row',  sets:3, repLow:10, repHigh:12, superset:'ss1' },
       { id:'pullover',  startWeight:30, name:'DB Pullover',          sets:3, repLow:10, repHigh:12, superset:'ss1' },
@@ -249,7 +261,8 @@ for(const day of DEFAULT_DATA.program.days)
   for(const ex of day.exercises)
     if(FORM_GUIDE[ex.id]) ex.form = FORM_GUIDE[ex.id];
 
-// Back-fill form guides into a program that predates them (matched by day+exercise id).
+// Back-fill program fields that predate this app version (form guides, rest
+// targets), matched by day+exercise id. Never overwrites existing values.
 function ensureFormGuides(){
   if(!data || !data.program) return false;
   let changed = false;
@@ -257,9 +270,10 @@ function ensureFormGuides(){
     const defDay = DEFAULT_DATA.program.days.find(d => d.id === day.id);
     if(!defDay) continue;
     for(const ex of day.exercises){
-      if(ex.form) continue;
       const defEx = defDay.exercises.find(e => e.id === ex.id);
-      if(defEx && defEx.form){ ex.form = defEx.form; changed = true; }
+      if(!defEx) continue;
+      if(!ex.form && defEx.form){ ex.form = defEx.form; changed = true; }
+      if(ex.rest == null && defEx.rest != null){ ex.rest = defEx.rest; changed = true; }
     }
   }
   return changed;
@@ -523,6 +537,43 @@ function removeEntry(dayId, exId, date){
   scheduleSave();
 }
 
+/* ============ rest timer ============ */
+const $restbar = document.getElementById('restbar');
+const $restTime = document.getElementById('restTime');
+let restEnd = 0, restInt = null;
+
+function restFor(ex){ return ex.rest || (ex.superset ? 60 : 90); }
+
+function startRest(secs){
+  if(currentView !== 'session' || currentSessionDate) return; // not when editing history
+  restEnd = Date.now() + secs * 1000;
+  document.body.classList.add('resting');
+  $restbar.classList.remove('hidden');
+  $restbar.classList.remove('done');
+  clearInterval(restInt);
+  restInt = setInterval(tickRest, 250);
+  tickRest();
+}
+
+function tickRest(){
+  const left = Math.ceil((restEnd - Date.now()) / 1000);
+  if(left <= 0){
+    $restTime.textContent = 'Go!';
+    $restbar.classList.add('done');
+    clearInterval(restInt); restInt = null;
+    if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+  }else{
+    $restTime.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+  }
+}
+
+function stopRest(){
+  clearInterval(restInt); restInt = null;
+  $restbar.classList.add('hidden');
+  document.body.classList.remove('resting');
+}
+$restbar.onclick = stopRest;
+
 /* ============ UI chrome ============ */
 const $view = document.getElementById('view');
 const $title = document.getElementById('title');
@@ -551,6 +602,7 @@ function go(view, dayId, sessionDate){
   currentView = view;
   currentDayId = dayId || null;
   currentSessionDate = sessionDate || null;
+  stopRest();
   render();
   window.scrollTo(0, 0);
 }
@@ -763,9 +815,9 @@ function exerciseCard(day, ex, ws){
     minus.onclick = () => {
       // stepping below 0 blanks the set again
       state.reps[i] = state.reps[i] == null ? ex.repLow : (state.reps[i] - repStep < 0 ? null : state.reps[i] - repStep);
-      paintRep(i); commit();
+      paintRep(i); commit(); startRest(restFor(ex));
     };
-    plus.onclick = () => { state.reps[i] = state.reps[i] == null ? ex.repLow : state.reps[i] + repStep; paintRep(i); commit(); };
+    plus.onclick = () => { state.reps[i] = state.reps[i] == null ? ex.repLow : state.reps[i] + repStep; paintRep(i); commit(); startRest(restFor(ex)); };
     cell.appendChild(minus); cell.appendChild(rep); cell.appendChild(plus);
     grid.appendChild(cell);
   }
@@ -787,6 +839,7 @@ function exerciseCard(day, ex, ws){
     doneBtn.classList.toggle('on', state.done);
     card.classList.toggle('done', state.done);
     commit(true);
+    if(state.done) startRest(restFor(ex));
   };
   const clearBtn = el('button','clearbtn','Clear');
   clearBtn.onclick = () => { removeEntry(day.id, ex.id, currentSessionDate); render(); };

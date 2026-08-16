@@ -15,6 +15,7 @@ Single-user workout tracker PWA. One user (Jeff), phone + PC, no server.
 
 - **Done = logged.** Stepper taps write scratch entries (synced, restore mid-workout), but an exercise only counts toward history, progression, and "Last:" dates once marked done (`entry.done`). Past sessions with zero done entries are pruned on load as abandoned scratch.
 - **Form guides are program data**: `form: { how, cues[] }` per exercise in the gist JSON, back-filled into pre-existing gists by `ensureFormGuides()` (matched by day id + exercise id).
+- **Rest timer defaults live in code, overrides in data**: auto rest countdown on rep taps / Log — `ex.rest` seconds if set (priority slots get 150 in the default program), else 60 for superset lifts, 90 otherwise. `ensureFormGuides()` also back-fills missing `rest` fields. No timer while editing a past session.
 
 ## Git
 
