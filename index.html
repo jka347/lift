@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e0f12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Lift</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-512.png">
+<link rel="apple-touch-icon" href="icon-512.png">
+<style>
+  :root{
+    --bg:#0e0f12; --card:#191b21; --card2:#22252d; --line:#2e323c;
+    --text:#e8eaed; --dim:#9aa0ab; --accent:#4ade80; --accent-dim:#173722;
+    --warn:#fbbf24; --danger:#f87171;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0; padding:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:17px; overscroll-behavior-y:contain;}
+  header{position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:8px;
+    padding:calc(env(safe-area-inset-top) + 10px) 12px 10px; background:var(--bg);
+    border-bottom:1px solid var(--line);}
+  header h1{font-size:19px; margin:0; flex:1; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .iconbtn{background:none; border:none; color:var(--text); font-size:24px; padding:8px 12px;
+    min-width:48px; min-height:44px; cursor:pointer; border-radius:10px;}
+  .iconbtn:active{background:var(--card2);}
+  #syncDot{width:10px; height:10px; border-radius:50%; background:var(--accent); flex:none;}
+  #syncDot.dirty{background:var(--warn);}
+  #syncDot.offline{background:var(--dim);}
+  main{padding:14px 12px calc(env(safe-area-inset-bottom) + 40px); max-width:560px; margin:0 auto;}
+  #banner{position:sticky; top:0; z-index:9; margin:0; padding:10px 14px; background:#3a2f12;
+    color:var(--warn); font-size:14px; display:flex; align-items:center; gap:10px;}
+  #banner.error{background:#3a1717; color:var(--danger);}
+  #banner button{margin-left:auto; background:none; border:none; color:inherit; font-size:18px; padding:4px 8px; cursor:pointer;}
+  .hidden{display:none !important;}
+
+  /* Home */
+  .daybtn{display:block; width:100%; text-align:left; background:var(--card); color:var(--text);
+    border:1px solid var(--line); border-radius:16px; padding:20px 18px; margin-bottom:12px;
+    font-size:19px; font-weight:600; cursor:pointer;}
+  .daybtn:active{background:var(--card2);}
+  .daybtn .last{display:block; font-size:14px; font-weight:400; color:var(--dim); margin-top:4px;}
+
+  /* Session */
+  .ssgroup{border:1px solid var(--accent-dim); border-radius:18px; padding:8px; margin-bottom:14px; position:relative;}
+  .ssgroup::before{content:"SUPERSET"; position:absolute; top:-9px; left:16px; background:var(--bg);
+    color:var(--accent); font-size:11px; letter-spacing:1.5px; padding:0 8px; font-weight:700;}
+  .ssgroup .card{margin-bottom:8px;}
+  .ssgroup .card:last-child{margin-bottom:0;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:14px;}
+  .card.done{opacity:.55;}
+  .card .exname{font-size:18px; font-weight:700; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .badge{background:var(--accent-dim); color:var(--accent); font-size:12px; font-weight:700;
+    padding:3px 9px; border-radius:999px; white-space:nowrap;}
+  .target{color:var(--dim); font-size:14px; margin-top:2px;}
+  .lastline{color:var(--dim); font-size:14px; margin-top:6px;}
+  .lastline b{color:var(--text); font-weight:600;}
+  .weightrow{display:flex; align-items:center; gap:10px; margin-top:12px;}
+  .weightrow .val{flex:1; text-align:center; font-size:26px; font-weight:700;}
+  .weightrow .val small{font-size:14px; color:var(--dim); font-weight:400;}
+  .step{background:var(--card2); border:1px solid var(--line); color:var(--text); border-radius:12px;
+    font-size:26px; font-weight:600; width:64px; height:52px; cursor:pointer; flex:none;}
+  .step:active{background:var(--line);}
+  .setgrid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px;}
+  .setcell{display:flex; align-items:center; gap:6px; background:var(--card2); border:1px solid var(--line);
+    border-radius:12px; padding:6px;}
+  .setcell .lbl{font-size:12px; color:var(--dim); width:26px; text-align:center; flex:none;}
+  .setcell .rep{flex:1; text-align:center; font-size:20px; font-weight:700;}
+  .setcell .rep.empty{color:var(--dim); font-weight:400;}
+  .ministep{background:var(--card); border:1px solid var(--line); color:var(--text); border-radius:9px;
+    font-size:20px; width:44px; height:44px; cursor:pointer; flex:none;}
+  .ministep:active{background:var(--line);}
+  .donebtn{display:block; width:100%; margin-top:12px; padding:13px; font-size:16px; font-weight:700;
+    border-radius:12px; border:1px solid var(--line); background:var(--card2); color:var(--text); cursor:pointer;}
+  .donebtn.on{background:var(--accent-dim); color:var(--accent); border-color:var(--accent-dim);}
+
+  /* Settings / setup */
+  .field{margin-bottom:18px;}
+  .field label{display:block; font-size:14px; color:var(--dim); margin-bottom:6px;}
+  input[type=password], input[type=text], textarea{width:100%; background:var(--card); color:var(--text);
+    border:1px solid var(--line); border-radius:12px; padding:13px; font-size:16px;}
+  textarea{font-family:ui-monospace,Consolas,monospace; font-size:13px; min-height:280px;}
+  .btn{display:inline-block; background:var(--accent); color:#08130b; border:none; border-radius:12px;
+    padding:13px 20px; font-size:16px; font-weight:700; cursor:pointer;}
+  .btn.secondary{background:var(--card2); color:var(--text); border:1px solid var(--line);}
+  .btn:active{opacity:.8;}
+  .status{font-size:14px; color:var(--dim); line-height:1.6;}
+  .status b{color:var(--text);}
+  .note{font-size:14px; color:var(--dim); line-height:1.5; margin-bottom:16px;}
+  .err{color:var(--danger); font-size:14px; margin-top:8px; min-height:1em;}
+  h2{font-size:16px; color:var(--dim); font-weight:600; text-transform:uppercase; letter-spacing:1px;
+    margin:26px 0 10px;}
+
+  /* modal */
+  #modal{position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:50; display:flex;
+    align-items:center; justify-content:center; padding:24px;}
+  #modal .box{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; max-width:420px;}
+  #modal p{margin:0 0 18px; line-height:1.5;}
+  #modal .btn{width:100%; margin-bottom:10px;}
+</style>
+</head>
+<body>
+<header>
+  <button id="backBtn" class="iconbtn hidden" aria-label="Back">‹</button>
+  <h1 id="title">Lift</h1>
+  <div id="syncDot" title="Synced"></div>
+  <button id="settingsBtn" class="iconbtn" aria-label="Settings">⚙</button>
+</header>
+<div id="banner" class="hidden"><span id="bannerText"></span><button id="bannerClose" aria-label="Dismiss">×</button></div>
+<main id="view"></main>
+
+<script>
+'use strict';
+
+/* ============ constants / defaults ============ */
+const GIST_FILE = 'tracker-data.json';
+const API = 'https://api.github.com';
+
+// Default program used only to seed the gist on very first run.
+// The live program is always the data in the gist (editable in Settings).
+const DEFAULT_DATA = {
+  version: 1,
+  updated_at: null,
+  settings: { units: 'lb' },
+  program: { days: [
+    { id:'upperA', name:'Upper A — Chest & Shoulders', exercises:[
+      { id:'bench',    startWeight:45, name:'DB Bench Press',              sets:4, repLow:6,  repHigh:10, perSide:false, superset:null },
+      { id:'ohp',      startWeight:20, name:'DB Overhead Press',           sets:3, repLow:8,  repHigh:12, perSide:false, superset:null },
+      { id:'incline',  startWeight:35, name:'Incline DB Bench',            sets:3, repLow:8,  repHigh:12, perSide:false, superset:'ss1' },
+      { id:'row',      startWeight:45, name:'One-Arm Row',                 sets:3, repLow:8,  repHigh:12, perSide:true,  superset:'ss1' },
+      { id:'latraise', startWeight:10, name:'Lateral Raises',              sets:3, repLow:12, repHigh:15, perSide:false, superset:'ss2' },
+      { id:'curl',     startWeight:20, name:'DB Curls',                    sets:3, repLow:12, repHigh:15, perSide:false, superset:'ss2' },
+      { id:'triext',   startWeight:25, name:'Overhead Triceps Extension',  sets:3, repLow:10, repHigh:12, perSide:false, superset:'ss3' },
+      { id:'hammer',   startWeight:25, name:'Hammer Curls',                sets:3, repLow:10, repHigh:12, perSide:false, superset:'ss3' }
+    ]},
+    { id:'upperB', name:'Upper B — Back & Arms', exercises:[
+      { id:'rowheavy',  startWeight:50, name:'One-Arm Row (heavy)',  sets:4, repLow:6,  repHigh:10, perSide:true },
+      { id:'bench2',    startWeight:40, name:'DB Bench Press',       sets:3, repLow:8,  repHigh:12 },
+      { id:'csrow',     startWeight:30, name:'Chest-Supported Row',  sets:3, repLow:10, repHigh:12, superset:'ss1' },
+      { id:'pullover',  startWeight:30, name:'DB Pullover',          sets:3, repLow:10, repHigh:12, superset:'ss1' },
+      { id:'seatpress', startWeight:20, name:'Seated DB Press',      sets:3, repLow:10, repHigh:15, superset:'ss2' },
+      { id:'reardelt',  startWeight:10, name:'Rear Delt Flyes',      sets:3, repLow:10, repHigh:15, superset:'ss2' },
+      { id:'curl2',     startWeight:25, name:'DB Curls',             sets:3, repLow:8,  repHigh:12, superset:'ss3' },
+      { id:'skull',     startWeight:15, name:'Skull Crushers',       sets:3, repLow:8,  repHigh:12, superset:'ss3' }
+    ]},
+    { id:'lowerA', name:'Lower + Core', exercises:[
+      { id:'rdl',      startWeight:45, name:'Romanian Deadlift', sets:4, repLow:8,  repHigh:10 },
+      { id:'goblet',   startWeight:45, name:'Goblet Squat',      sets:3, repLow:10, repHigh:12 },
+      { id:'kbswing',  startWeight:20, name:'KB Swings',         sets:3, repLow:15, repHigh:20 },
+      { id:'wsitup',   startWeight:10, name:'Weighted Sit-Ups',  sets:3, repLow:10, repHigh:15 },
+      { id:'legraise', startWeight:0,  name:'Bench Leg Raises',  sets:3, repLow:10, repHigh:15 }
+    ]},
+    { id:'lowerB', name:'Lower + Core B', exercises:[
+      { id:'rdlheavy',  startWeight:50, name:'RDL (heavy)',            sets:4, repLow:6,  repHigh:8 },
+      { id:'hipthrust', startWeight:50, name:'Hip Thrust',             sets:3, repLow:10, repHigh:12 },
+      { id:'tgu',       startWeight:20, name:'Turkish Get-Up',         sets:3, repLow:3,  repHigh:3,  perSide:true },
+      { id:'twist',     startWeight:20, name:'KB Russian Twists',      sets:3, repLow:12, repHigh:16 },
+      { id:'carry',     startWeight:45, name:'Suitcase Carry (heavy)', sets:3, repLow:30, repHigh:30, perSide:true, unit:'sec' }
+    ]}
+  ]},
+  sessions: []
+};
+
+/* ============ storage helpers ============ */
+const store = {
+  get pat(){ return localStorage.getItem('lift_pat') || ''; },
+  set pat(v){ v ? localStorage.setItem('lift_pat', v) : localStorage.removeItem('lift_pat'); },
+  get gistId(){ return localStorage.getItem('lift_gistId') || ''; },
+  set gistId(v){ v ? localStorage.setItem('lift_gistId', v) : localStorage.removeItem('lift_gistId'); },
+  get baseline(){ return localStorage.getItem('lift_baseline') || null; },
+  set baseline(v){ v ? localStorage.setItem('lift_baseline', v) : localStorage.removeItem('lift_baseline'); },
+  get dirty(){ return localStorage.getItem('lift_dirty') === '1'; },
+  set dirty(v){ v ? localStorage.setItem('lift_dirty','1') : localStorage.removeItem('lift_dirty'); },
+  loadData(){ try{ const s = localStorage.getItem('lift_data'); return s ? JSON.parse(s) : null; }catch(e){ return null; } },
+  saveData(d){ localStorage.setItem('lift_data', JSON.stringify(d)); }
+};
+
+let data = null;
+let currentView = 'home';   // 'home' | 'session' | 'settings' | 'setup'
+let currentDayId = null;
+let saveTimer = null;
+let offline = false;
+let syncing = false;
+
+/* ============ small utils ============ */
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function fmtDate(iso){
+  if(!iso) return null;
+  const [y,m,d] = iso.split('-').map(Number);
+  return new Date(y, m-1, d).toLocaleDateString(undefined, { month:'short', day:'numeric' });
+}
+function el(tag, cls, text){
+  const n = document.createElement(tag);
+  if(cls) n.className = cls;
+  if(text != null) n.textContent = text;
+  return n;
+}
+
+/* ============ GitHub gist API ============ */
+class AuthError extends Error {}
+
+async function gh(path, opts = {}){
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: {
+      'Authorization': 'Bearer ' + store.pat,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(opts.headers || {})
+    }
+  });
+  if(res.status === 401 || res.status === 403) throw new AuthError('GitHub rejected the token (' + res.status + ')');
+  if(!res.ok) throw new Error('GitHub API error ' + res.status);
+  return res.json();
+}
+
+async function fetchRemote(){
+  const g = await gh('/gists/' + store.gistId);
+  const f = g.files && g.files[GIST_FILE];
+  if(!f) throw new Error('Gist is missing ' + GIST_FILE);
+  return JSON.parse(f.content);
+}
+
+async function findOrCreateGist(){
+  // Reconnect path: look for an existing gist holding our file.
+  const gists = await gh('/gists?per_page=100');
+  const found = gists.find(g => g.files && g.files[GIST_FILE]);
+  if(found) return found.id;
+  const seed = data || DEFAULT_DATA;
+  seed.updated_at = new Date().toISOString();
+  const created = await gh('/gists', {
+    method: 'POST',
+    body: JSON.stringify({
+      description: 'lift — workout tracker data',
+      public: false,
+      files: { [GIST_FILE]: { content: JSON.stringify(seed, null, 2) } }
+    })
+  });
+  data = seed;
+  store.baseline = seed.updated_at;
+  return created.id;
+}
+
+/* ============ sync ============ */
+function persistLocal(){ if(data) store.saveData(data); }
+
+function markDirty(){
+  store.dirty = true;
+  updateSyncDot();
+}
+
+function scheduleSave(){
+  persistLocal();
+  markDirty();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSave, 10000); // debounce ~10s to limit API calls
+}
+
+async function flushSave(){
+  clearTimeout(saveTimer);
+  if(!store.dirty || !data || !store.pat || !store.gistId) return;
+  if(!navigator.onLine){ offline = true; updateSyncDot(); return; }
+  if(syncing) return;
+  syncing = true;
+  try{
+    // last-write-wins, guarded: re-fetch and compare against our baseline
+    let remote = null;
+    try{ remote = await fetchRemote(); }catch(e){ if(e instanceof AuthError) throw e; }
+    if(remote && remote.updated_at && store.baseline && remote.updated_at > store.baseline){
+      const choice = await askConflict();
+      if(choice === 'reload'){
+        data = remote;
+        store.baseline = remote.updated_at;
+        store.dirty = false;
+        persistLocal();
+        render();
+        return;
+      }
+      // 'overwrite' falls through to PATCH
+    }
+    data.updated_at = new Date().toISOString();
+    await gh('/gists/' + store.gistId, {
+      method: 'PATCH',
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(data, null, 2) } } })
+    });
+    store.baseline = data.updated_at;
+    store.dirty = false;
+    persistLocal();
+    offline = false;
+  }catch(e){
+    if(e instanceof AuthError){
+      showBanner('GitHub token rejected — update it in Settings. Your data is safe on this device.', true);
+    }else{
+      offline = true; // stays queued; retried on reconnect
+    }
+  }finally{
+    syncing = false;
+    updateSyncDot();
+  }
+}
+
+async function hydrate(){
+  if(!store.gistId) store.gistId = await findOrCreateGist();
+  const remote = await fetchRemote();
+  if(store.dirty && data){
+    // Queued local writes exist. If remote moved past our baseline, ask; else push ours.
+    if(remote.updated_at && store.baseline && remote.updated_at > store.baseline){
+      const choice = await askConflict();
+      if(choice === 'reload'){
+        data = remote;
+        store.baseline = remote.updated_at;
+        store.dirty = false;
+        persistLocal();
+        return;
+      }
+    }
+    await flushSave();
+  }else{
+    data = remote;
+    store.baseline = remote.updated_at || null;
+    persistLocal();
+  }
+}
+
+function askConflict(){
+  return new Promise(resolve => {
+    const overlay = el('div'); overlay.id = 'modal';
+    const box = el('div','box');
+    box.appendChild(el('p', null, 'Remote data is newer than what this device last saw. Reload the remote data, or overwrite it with this device’s data?'));
+    const reload = el('button','btn','Reload remote (discard this device’s changes)');
+    const overwrite = el('button','btn secondary','Overwrite remote with this device’s data');
+    reload.onclick = () => { overlay.remove(); resolve('reload'); };
+    overwrite.onclick = () => { overlay.remove(); resolve('overwrite'); };
+    box.appendChild(reload); box.appendChild(overwrite);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+  });
+}
+
+/* ============ session data helpers ============ */
+function getDay(dayId){ return data.program.days.find(d => d.id === dayId); }
+
+function workingSession(dayId){
+  return data.sessions.find(s => s.date === todayStr() && s.dayId === dayId) || null;
+}
+
+function ensureWorkingSession(dayId){
+  let s = workingSession(dayId);
+  if(!s){ s = { date: todayStr(), dayId, entries: [] }; data.sessions.push(s); }
+  return s;
+}
+
+function lastEntryFor(exId, excludeSession){
+  const sorted = [...data.sessions].sort((a,b) => a.date < b.date ? 1 : -1);
+  for(const s of sorted){
+    if(s === excludeSession) continue;
+    const e = s.entries.find(e => e.exerciseId === exId);
+    if(e && Array.isArray(e.reps) && e.reps.length) return e;
+  }
+  return null;
+}
+
+function lastSessionDate(dayId){
+  let best = null;
+  for(const s of data.sessions){
+    if(s.dayId === dayId && s.entries.length && (!best || s.date > best)) best = s.date;
+  }
+  return best;
+}
+
+// Double progression: last session hit repHigh on ALL sets → +5 lb.
+function computePrefill(ex, excludeSession){
+  const last = lastEntryFor(ex.id, excludeSession);
+  if(!last){
+    return { weight: ex.startWeight, reps: Array(ex.sets).fill(null), progressed: false, last: null };
+  }
+  const progressed = last.reps.length >= ex.sets && Math.min(...last.reps) >= ex.repHigh;
+  if(progressed){
+    return { weight: last.weight + 5, reps: Array(ex.sets).fill(ex.repLow), progressed: true, last };
+  }
+  const reps = Array.from({length: ex.sets}, (_, i) => last.reps[i] != null ? last.reps[i] : last.reps[last.reps.length-1]);
+  return { weight: last.weight, reps, progressed: false, last };
+}
+
+function writeEntry(dayId, ex, weight, reps, done){
+  const s = ensureWorkingSession(dayId);
+  let e = s.entries.find(e => e.exerciseId === ex.id);
+  if(!e){ e = { exerciseId: ex.id }; s.entries.push(e); }
+  e.weight = weight;
+  e.reps = reps.filter(r => r != null);
+  if(done) e.done = true; else delete e.done;
+  scheduleSave();
+}
+
+/* ============ UI chrome ============ */
+const $view = document.getElementById('view');
+const $title = document.getElementById('title');
+const $back = document.getElementById('backBtn');
+const $settingsBtn = document.getElementById('settingsBtn');
+const $syncDot = document.getElementById('syncDot');
+const $banner = document.getElementById('banner');
+const $bannerText = document.getElementById('bannerText');
+
+$back.onclick = () => { flushSave(); go('home'); };
+$settingsBtn.onclick = () => go(currentView === 'settings' ? 'home' : 'settings');
+document.getElementById('bannerClose').onclick = () => $banner.classList.add('hidden');
+
+function showBanner(msg, isError){
+  $bannerText.textContent = msg;
+  $banner.classList.toggle('error', !!isError);
+  $banner.classList.remove('hidden');
+}
+
+function updateSyncDot(){
+  $syncDot.className = offline ? 'offline' : (store.dirty ? 'dirty' : '');
+  $syncDot.title = offline ? 'Offline — writes queued' : (store.dirty ? 'Unsynced changes' : 'Synced');
+}
+
+function go(view, dayId){
+  currentView = view;
+  currentDayId = dayId || null;
+  render();
+  window.scrollTo(0, 0);
+}
+
+function render(){
+  $view.textContent = '';
+  $back.classList.toggle('hidden', currentView === 'home' || currentView === 'setup');
+  $settingsBtn.classList.toggle('hidden', currentView === 'setup');
+  if(currentView === 'setup') renderSetup();
+  else if(currentView === 'session') renderSession();
+  else if(currentView === 'settings') renderSettings();
+  else renderHome();
+  updateSyncDot();
+}
+
+/* ============ views ============ */
+function renderHome(){
+  $title.textContent = 'Lift';
+  if(!data){ $view.appendChild(el('p','note','Loading…')); return; }
+  for(const day of data.program.days){
+    const b = el('button','daybtn');
+    b.appendChild(document.createTextNode(day.name));
+    const last = lastSessionDate(day.id);
+    b.appendChild(el('span','last', last ? 'Last: ' + fmtDate(last) : 'Never done'));
+    b.onclick = () => go('session', day.id);
+    $view.appendChild(b);
+  }
+}
+
+function renderSession(){
+  const day = getDay(currentDayId);
+  if(!day){ go('home'); return; }
+  $title.textContent = day.name;
+  const ws = workingSession(day.id);
+
+  // group consecutive exercises that share a superset id
+  const groups = [];
+  for(const ex of day.exercises){
+    const g = groups[groups.length - 1];
+    if(ex.superset && g && g.superset === ex.superset) g.items.push(ex);
+    else groups.push({ superset: ex.superset || null, items: [ex] });
+  }
+  for(const g of groups){
+    if(g.superset && g.items.length > 1){
+      const wrap = el('div','ssgroup');
+      for(const ex of g.items) wrap.appendChild(exerciseCard(day, ex, ws));
+      $view.appendChild(wrap);
+    }else{
+      for(const ex of g.items) $view.appendChild(exerciseCard(day, ex, ws));
+    }
+  }
+}
+
+function exerciseCard(day, ex, ws){
+  const existing = ws && ws.entries.find(e => e.exerciseId === ex.id);
+  const pre = computePrefill(ex, ws);
+  const unit = ex.unit === 'sec' ? 'sec' : 'reps';
+  const repStep = unit === 'sec' ? 5 : 1;
+
+  // live card state: today's entry if present, else prefill
+  const state = {
+    weight: existing ? existing.weight : pre.weight,
+    reps: existing
+      ? Array.from({length: ex.sets}, (_, i) => existing.reps[i] != null ? existing.reps[i] : null)
+      : pre.reps.slice(),
+    done: !!(existing && existing.done),
+    touched: !!existing
+  };
+
+  const card = el('div','card' + (state.done ? ' done' : ''));
+
+  const name = el('div','exname', ex.name + (ex.perSide ? ' / side' : ''));
+  if(pre.progressed && !state.touched) name.appendChild(el('span','badge','⬆ Add weight'));
+  card.appendChild(name);
+
+  const targetReps = ex.repLow === ex.repHigh ? String(ex.repLow) : ex.repLow + '–' + ex.repHigh;
+  card.appendChild(el('div','target', ex.sets + ' × ' + targetReps + (unit === 'sec' ? ' sec' : '')));
+
+  const lastLine = el('div','lastline');
+  if(pre.last){
+    lastLine.innerHTML = 'Last: <b>' + esc(pre.last.weight) + ' ' + esc(data.settings.units) + '</b> — ' + esc(pre.last.reps.join('/'));
+  }else{
+    lastLine.textContent = 'First time — starting at ' + ex.startWeight + ' ' + data.settings.units;
+  }
+  card.appendChild(lastLine);
+
+  // weight stepper
+  const wrow = el('div','weightrow');
+  const wminus = el('button','step','−');
+  const wval = el('div','val');
+  const wplus = el('button','step','+');
+  function paintWeight(){ wval.innerHTML = esc(state.weight) + ' <small>' + esc(data.settings.units) + '</small>'; }
+  paintWeight();
+  wminus.onclick = () => { state.weight = Math.max(0, state.weight - 5); paintWeight(); commit(); };
+  wplus.onclick = () => { state.weight += 5; paintWeight(); commit(); };
+  wrow.appendChild(wminus); wrow.appendChild(wval); wrow.appendChild(wplus);
+  card.appendChild(wrow);
+
+  // per-set rep steppers
+  const grid = el('div','setgrid');
+  const repEls = [];
+  for(let i = 0; i < ex.sets; i++){
+    const cell = el('div','setcell');
+    cell.appendChild(el('span','lbl','S' + (i+1)));
+    const minus = el('button','ministep','−');
+    const rep = el('span','rep');
+    const plus = el('button','ministep','+');
+    repEls.push(rep);
+    minus.onclick = () => { state.reps[i] = state.reps[i] == null ? ex.repLow : Math.max(0, state.reps[i] - repStep); paintRep(i); commit(); };
+    plus.onclick = () => { state.reps[i] = state.reps[i] == null ? ex.repLow : state.reps[i] + repStep; paintRep(i); commit(); };
+    cell.appendChild(minus); cell.appendChild(rep); cell.appendChild(plus);
+    grid.appendChild(cell);
+  }
+  function paintRep(i){
+    repEls[i].textContent = state.reps[i] == null ? '–' : state.reps[i];
+    repEls[i].classList.toggle('empty', state.reps[i] == null);
+  }
+  for(let i = 0; i < ex.sets; i++) paintRep(i);
+  card.appendChild(grid);
+
+  // done toggle
+  const doneBtn = el('button','donebtn' + (state.done ? ' on' : ''), state.done ? '✓ Done' : 'Mark done');
+  doneBtn.onclick = () => {
+    state.done = !state.done;
+    if(state.done && state.reps.every(r => r == null)) state.reps = state.reps.map((_, i) => pre.reps[i]);
+    for(let i = 0; i < ex.sets; i++) paintRep(i);
+    doneBtn.textContent = state.done ? '✓ Done' : 'Mark done';
+    doneBtn.classList.toggle('on', state.done);
+    card.classList.toggle('done', state.done);
+    commit(true);
+  };
+  card.appendChild(doneBtn);
+
+  function commit(fromDone){
+    state.touched = true;
+    writeEntry(day.id, ex, state.weight, state.reps, state.done);
+    if(!fromDone) updateSyncDot();
+  }
+
+  return card;
+}
+
+function renderSettings(){
+  $title.textContent = 'Settings';
+
+  // --- sync / token ---
+  $view.appendChild(el('h2', null, 'Sync'));
+  const status = el('div','status');
+  status.innerHTML =
+    'Token: <b>' + (store.pat ? 'saved on this device' : 'not set') + '</b><br>' +
+    'Gist: <b>' + (store.gistId ? esc(store.gistId) : 'not connected') + '</b><br>' +
+    'Last sync: <b>' + (store.baseline ? new Date(store.baseline).toLocaleString() : 'never') + '</b><br>' +
+    'Queued changes: <b>' + (store.dirty ? 'yes (unsynced)' : 'none') + '</b>';
+  $view.appendChild(status);
+
+  const patField = el('div','field');
+  patField.style.marginTop = '14px';
+  const patLabel = el('label', null, 'GitHub token (fine-grained PAT, gist scope only)');
+  const patInput = el('input');
+  patInput.type = 'password';
+  patInput.placeholder = store.pat ? '•••• saved — paste to replace' : 'github_pat_…';
+  patInput.autocomplete = 'off';
+  const patErr = el('div','err');
+  const patBtn = el('button','btn','Save token & reconnect');
+  patBtn.style.marginTop = '10px';
+  patBtn.onclick = async () => {
+    const v = patInput.value.trim();
+    if(!v){ patErr.textContent = 'Paste a token first.'; return; }
+    patErr.textContent = '';
+    patBtn.disabled = true; patBtn.textContent = 'Connecting…';
+    store.pat = v;
+    store.gistId = '';
+    try{
+      await hydrate();
+      offline = false;
+      $banner.classList.add('hidden');
+      render();
+    }catch(e){
+      store.pat = e instanceof AuthError ? '' : store.pat;
+      patErr.textContent = e instanceof AuthError ? 'Token rejected by GitHub. Check scopes and expiry.' : 'Could not reach GitHub: ' + e.message;
+      patBtn.disabled = false; patBtn.textContent = 'Save token & reconnect';
+    }
+  };
+  patField.appendChild(patLabel); patField.appendChild(patInput); patField.appendChild(patBtn); patField.appendChild(patErr);
+  $view.appendChild(patField);
+
+  const syncNow = el('button','btn secondary','Sync now');
+  syncNow.onclick = async () => { await flushSave(); render(); };
+  $view.appendChild(syncNow);
+
+  // --- data ---
+  $view.appendChild(el('h2', null, 'Data'));
+  $view.appendChild(el('div','status')).innerHTML = 'Units: <b>' + esc(data ? data.settings.units : 'lb') + '</b>';
+  const exportBtn = el('button','btn secondary','Export JSON');
+  exportBtn.style.marginTop = '10px';
+  exportBtn.onclick = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'tracker-data-' + todayStr() + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  $view.appendChild(exportBtn);
+
+  // --- program editor ---
+  $view.appendChild(el('h2', null, 'Program (raw JSON)'));
+  $view.appendChild(el('p','note','The program is data. Edit carefully; Validate & save pushes it to the gist.'));
+  const ta = el('textarea');
+  ta.value = data ? JSON.stringify(data.program, null, 2) : '';
+  ta.spellcheck = false;
+  const progErr = el('div','err');
+  const progBtn = el('button','btn','Validate & save program');
+  progBtn.style.marginTop = '10px';
+  progBtn.onclick = () => {
+    try{
+      const prog = JSON.parse(ta.value);
+      const msg = validateProgram(prog);
+      if(msg) throw new Error(msg);
+      data.program = prog;
+      scheduleSave();
+      flushSave();
+      progErr.style.color = 'var(--accent)';
+      progErr.textContent = 'Saved ✓';
+    }catch(e){
+      progErr.style.color = '';
+      progErr.textContent = e.message;
+    }
+  };
+  $view.appendChild(ta); $view.appendChild(progBtn); $view.appendChild(progErr);
+}
+
+function validateProgram(prog){
+  if(!prog || !Array.isArray(prog.days) || !prog.days.length) return 'Program needs a non-empty "days" array.';
+  for(const d of prog.days){
+    if(!d.id || !d.name || !Array.isArray(d.exercises)) return 'Each day needs id, name, exercises[].';
+    for(const ex of d.exercises){
+      if(!ex.id || !ex.name) return 'Exercise in "' + d.name + '" is missing id or name.';
+      if(!(ex.sets > 0)) return '"' + ex.name + '": sets must be > 0.';
+      if(!(ex.repLow > 0) || !(ex.repHigh >= ex.repLow)) return '"' + ex.name + '": bad rep range.';
+      if(typeof ex.startWeight !== 'number' || ex.startWeight < 0) return '"' + ex.name + '": startWeight must be a number ≥ 0.';
+    }
+  }
+  return null;
+}
+
+function renderSetup(extraMsg){
+  $title.textContent = 'Lift — Setup';
+  $view.appendChild(el('p','note',
+    'One-time setup on this device: paste a fine-grained GitHub token with only the Gists permission (read & write). ' +
+    'The app stores your workout data in a private gist and the token only in this browser.'));
+  if(extraMsg) $view.appendChild(el('p','err', extraMsg));
+  const input = el('input');
+  input.type = 'password';
+  input.placeholder = 'github_pat_…';
+  input.autocomplete = 'off';
+  const err = el('div','err');
+  const btn = el('button','btn','Connect');
+  btn.style.marginTop = '14px';
+  btn.onclick = async () => {
+    const v = input.value.trim();
+    if(!v){ err.textContent = 'Paste a token first.'; return; }
+    btn.disabled = true; btn.textContent = 'Connecting…';
+    store.pat = v;
+    try{
+      await hydrate();
+      go('home');
+    }catch(e){
+      if(e instanceof AuthError) store.pat = '';
+      err.textContent = e instanceof AuthError ? 'Token rejected by GitHub. Check it has the Gists permission.' : 'Could not reach GitHub: ' + e.message;
+      btn.disabled = false; btn.textContent = 'Connect';
+    }
+  };
+  $view.appendChild(input); $view.appendChild(btn); $view.appendChild(err);
+}
+
+/* ============ boot ============ */
+async function init(){
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+  data = store.loadData();
+  offline = !navigator.onLine;
+
+  if(!store.pat){
+    if(data){ go('home'); showBanner('No GitHub token on this device — logging works locally. Add a token in Settings to sync.'); }
+    else go('setup');
+    return;
+  }
+
+  go('home'); // paint from cache immediately; hydrate below refreshes
+  try{
+    await hydrate();
+    offline = false;
+    render();
+  }catch(e){
+    if(e instanceof AuthError){
+      if(data){
+        showBanner('GitHub token rejected — update it in Settings. Local data is intact.', true);
+      }else{
+        store.pat = '';
+        go('setup');
+        renderSetupError();
+      }
+    }else{
+      offline = true;
+      if(data) showBanner('Offline — showing local data. Changes will sync when back online.');
+      else showBanner('Could not reach GitHub and no local data yet. Connect once online.', true);
+    }
+    updateSyncDot();
+  }
+}
+
+function renderSetupError(){
+  // re-render setup with the auth message
+  $view.textContent = '';
+  renderSetup('Saved token was rejected (expired or revoked). Paste a new one.');
+}
+
+window.addEventListener('online', () => { offline = false; updateSyncDot(); flushSave(); });
+window.addEventListener('offline', () => { offline = true; updateSyncDot(); });
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flushSave(); });
+
+init();
+</script>
+</body>
+</html>
