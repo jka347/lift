@@ -49,7 +49,18 @@
 
   /* Overview */
   .ovrow{display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--card);
-    border:1px solid var(--line); border-radius:12px; padding:11px 14px; margin-bottom:8px;}
+    border:1px solid var(--line); border-radius:12px; padding:11px 14px; margin-bottom:8px; cursor:pointer;}
+  .ovrow:active{background:var(--card2);}
+  .ovhist{display:none; background:var(--card2); border:1px solid var(--line); border-radius:10px;
+    padding:6px 14px; margin:-2px 0 10px; font-size:14px;}
+  .ovhist.open{display:block;}
+  .ovhist .hrow{display:flex; justify-content:space-between; gap:10px; padding:7px 0;
+    border-bottom:1px solid var(--line);}
+  .ovhist .hrow:last-child{border-bottom:none;}
+  .ovhist .hdate{color:var(--dim); flex:none;}
+  .ovhist .hreps{color:var(--dim);}
+  .ovhist .hw{font-weight:600;}
+  .ovhist .none{color:var(--dim); padding:8px 0;}
   .ovname{font-size:15px; min-width:0;}
   .ovname .sub{display:block; font-size:12px; color:var(--dim); margin-top:1px;}
   .ovweight{font-size:18px; font-weight:700; white-space:nowrap; text-align:right;}
@@ -598,6 +609,30 @@ function renderOverview(){
       }
       row.appendChild(name); row.appendChild(weight);
       $view.appendChild(row);
+
+      // tap the row for full logged history of this lift
+      const hist = el('div','ovhist');
+      $view.appendChild(hist);
+      row.onclick = () => {
+        if(!hist.classList.contains('open') && !hist.childNodes.length){
+          const sorted = [...data.sessions].sort((a,b) => a.date < b.date ? 1 : -1);
+          let any = false;
+          for(const s of sorted){
+            const e = s.entries.find(e => e.exerciseId === ex.id && e.done && e.reps && e.reps.length);
+            if(!e) continue;
+            any = true;
+            const h = el('div','hrow');
+            h.appendChild(el('span','hdate', fmtDate(s.date)));
+            const val = el('span');
+            val.appendChild(el('b','hw', e.weight + ' ' + data.settings.units));
+            val.appendChild(el('span','hreps', ' — ' + e.reps.join('/')));
+            h.appendChild(val);
+            hist.appendChild(h);
+          }
+          if(!any) hist.appendChild(el('div','none','Nothing logged yet.'));
+        }
+        hist.classList.toggle('open');
+      };
     }
   }
 }
