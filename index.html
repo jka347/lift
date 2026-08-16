@@ -319,6 +319,11 @@ const store = {
   set baseline(v){ v ? localStorage.setItem('lift_baseline', v) : localStorage.removeItem('lift_baseline'); },
   get dirty(){ return localStorage.getItem('lift_dirty') === '1'; },
   set dirty(v){ v ? localStorage.setItem('lift_dirty','1') : localStorage.removeItem('lift_dirty'); },
+  get deviceId(){
+    let v = localStorage.getItem('lift_device');
+    if(!v){ v = 'd' + Math.random().toString(36).slice(2, 10); localStorage.setItem('lift_device', v); }
+    return v;
+  },
   loadData(){ try{ const s = localStorage.getItem('lift_data'); return s ? JSON.parse(s) : null; }catch(e){ return null; } },
   saveData(d){ localStorage.setItem('lift_data', JSON.stringify(d)); }
 };
@@ -419,6 +424,12 @@ async function flushSave(){
     // last-write-wins, guarded: re-fetch and compare against our baseline
     let remote = null;
     try{ remote = await fetchRemote(); }catch(e){ if(e instanceof AuthError) throw e; }
+    // A "newer" remote written by this same device is our own completed write
+    // whose bookkeeping was lost (e.g. refresh mid-PATCH) — not a conflict.
+    if(remote && remote.updated_at && store.baseline && remote.updated_at > store.baseline
+        && remote.updated_by === store.deviceId){
+      store.baseline = remote.updated_at;
+    }
     if(remote && remote.updated_at && store.baseline && remote.updated_at > store.baseline){
       const choice = await askConflict();
       if(choice === 'reload'){
@@ -432,6 +443,7 @@ async function flushSave(){
       // 'overwrite' falls through to PATCH
     }
     data.updated_at = new Date().toISOString();
+    data.updated_by = store.deviceId;
     await gh('/gists/' + store.gistId, {
       method: 'PATCH',
       body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(data, null, 2) } } })
@@ -457,6 +469,11 @@ async function hydrate(){
   const remote = await fetchRemote();
   if(store.dirty && data){
     // Queued local writes exist. If remote moved past our baseline, ask; else push ours.
+    // Our own device's writes are never a conflict (refresh mid-PATCH loses bookkeeping).
+    if(remote.updated_at && store.baseline && remote.updated_at > store.baseline
+        && remote.updated_by === store.deviceId){
+      store.baseline = remote.updated_at;
+    }
     if(remote.updated_at && store.baseline && remote.updated_at > store.baseline){
       const choice = await askConflict();
       if(choice === 'reload'){
