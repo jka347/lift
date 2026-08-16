@@ -412,7 +412,9 @@ async function hydrate(){
     store.baseline = remote.updated_at || null;
     persistLocal();
   }
-  if(ensureFormGuides()){ persistLocal(); scheduleSave(); }
+  const migrated = ensureFormGuides();
+  const pruned = pruneScratchSessions();
+  if(migrated || pruned){ persistLocal(); scheduleSave(); }
 }
 
 function askConflict(){
@@ -443,12 +445,13 @@ function ensureWorkingSession(dayId){
   return s;
 }
 
+// Only entries marked done count as history — stepper taps alone are scratch.
 function lastEntryFor(exId, excludeSession){
   const sorted = [...data.sessions].sort((a,b) => a.date < b.date ? 1 : -1);
   for(const s of sorted){
     if(s === excludeSession) continue;
     const e = s.entries.find(e => e.exerciseId === exId);
-    if(e && Array.isArray(e.reps) && e.reps.length) return e;
+    if(e && e.done && Array.isArray(e.reps) && e.reps.length) return e;
   }
   return null;
 }
@@ -456,9 +459,16 @@ function lastEntryFor(exId, excludeSession){
 function lastSessionDate(dayId){
   let best = null;
   for(const s of data.sessions){
-    if(s.dayId === dayId && s.entries.length && (!best || s.date > best)) best = s.date;
+    if(s.dayId === dayId && s.entries.some(e => e.done) && (!best || s.date > best)) best = s.date;
   }
   return best;
+}
+
+// Past sessions where nothing was ever logged are abandoned scratch — drop them.
+function pruneScratchSessions(){
+  const before = data.sessions.length;
+  data.sessions = data.sessions.filter(s => s.date >= todayStr() || s.entries.some(e => e.done));
+  return data.sessions.length !== before;
 }
 
 // Double progression: last session hit repHigh on ALL sets → +5 lb.
@@ -564,7 +574,7 @@ function renderOverview(){
       const last = lastEntryFor(ex.id, null);
       const lastDate = (() => {
         const sorted = [...data.sessions].sort((a,b) => a.date < b.date ? 1 : -1);
-        const s = sorted.find(s => s.entries.some(e => e.exerciseId === ex.id && e.reps && e.reps.length));
+        const s = sorted.find(s => s.entries.some(e => e.exerciseId === ex.id && e.done && e.reps && e.reps.length));
         return s ? s.date : null;
       })();
       name.appendChild(el('span','sub', lastDate ? 'Last done ' + fmtDate(lastDate) : 'Not done yet'));
@@ -704,12 +714,12 @@ function exerciseCard(day, ex, ws){
 
   // done toggle + clear (removes today's entry, e.g. after an accidental tap)
   const btnrow = el('div','btnrow');
-  const doneBtn = el('button','donebtn' + (state.done ? ' on' : ''), state.done ? '✓ Done' : 'Mark done');
+  const doneBtn = el('button','donebtn' + (state.done ? ' on' : ''), state.done ? '✓ Logged' : 'Log ✓');
   doneBtn.onclick = () => {
     state.done = !state.done;
     if(state.done && state.reps.every(r => r == null)) state.reps = state.reps.map((_, i) => pre.reps[i]);
     for(let i = 0; i < ex.sets; i++) paintRep(i);
-    doneBtn.textContent = state.done ? '✓ Done' : 'Mark done';
+    doneBtn.textContent = state.done ? '✓ Logged' : 'Log ✓';
     doneBtn.classList.toggle('on', state.done);
     card.classList.toggle('done', state.done);
     commit(true);
@@ -882,7 +892,9 @@ async function init(){
 
   if(!store.pat){
     if(data){
-      if(ensureFormGuides()) persistLocal();
+      const migrated = ensureFormGuides();
+      const pruned = pruneScratchSessions();
+      if(migrated || pruned) persistLocal();
       go('home');
       showBanner('No GitHub token on this device — logging works locally. Add a token in Settings to sync.');
     }

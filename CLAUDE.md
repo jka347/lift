@@ -11,6 +11,11 @@ Single-user workout tracker PWA. One user (Jeff), phone + PC, no server.
 - **PWA home-screen label:** `short_name: "Lift"` in `manifest.json`. Long `name` can be more descriptive.
 - **Base paths matter.** Because the app is served from `/lift/` and not a domain root, the service worker scope, `manifest.json` `start_url`/`scope`, and the icon path must all be relative or `/lift/`-prefixed. Absolute `/`-rooted paths will 404 on Pages while appearing to work locally.
 
+## Decisions made after v1
+
+- **Done = logged.** Stepper taps write scratch entries (synced, restore mid-workout), but an exercise only counts toward history, progression, and "Last:" dates once marked done (`entry.done`). Past sessions with zero done entries are pruned on load as abandoned scratch.
+- **Form guides are program data**: `form: { how, cues[] }` per exercise in the gist JSON, back-filled into pre-existing gists by `ensureFormGuides()` (matched by day id + exercise id).
+
 ## Git
 
 `origin` is `https://jka347@github.com/jka347/lift.git`. The `jka347@` prefix is deliberate: the machine has two authenticated GitHub accounts and `jeff-simpat` is usually the active one, so without the username in the URL, pushes authenticate as the wrong account and fail. Do not strip it.
