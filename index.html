@@ -61,6 +61,11 @@
   .ssgroup{border:1px solid var(--accent-dim); border-radius:18px; padding:8px; margin-bottom:14px; position:relative;}
   .ssgroup::before{content:"SUPERSET"; position:absolute; top:-9px; left:16px; background:var(--bg);
     color:var(--accent); font-size:11px; letter-spacing:1.5px; padding:0 8px; font-weight:700;}
+  .sessnote{display:flex; justify-content:space-between; align-items:center; gap:8px;
+    font-size:14px; color:var(--dim); margin:-2px 0 12px; min-height:36px;}
+  .sessnote.editing{color:var(--warn);}
+  .linkbtn{background:none; border:none; color:var(--accent); font-size:14px; cursor:pointer;
+    padding:8px 0 8px 8px; flex:none;}
   .ssgroup .card{margin-bottom:8px;}
   .ssgroup .card:last-child{margin-bottom:0;}
   .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:14px;}
@@ -264,8 +269,9 @@ const store = {
 };
 
 let data = null;
-let currentView = 'home';   // 'home' | 'session' | 'settings' | 'setup'
+let currentView = 'home';   // 'home' | 'session' | 'overview' | 'settings' | 'setup'
 let currentDayId = null;
+let currentSessionDate = null; // null = today; a date = editing that past session
 let saveTimer = null;
 let offline = false;
 let syncing = false;
@@ -435,13 +441,15 @@ function askConflict(){
 /* ============ session data helpers ============ */
 function getDay(dayId){ return data.program.days.find(d => d.id === dayId); }
 
-function workingSession(dayId){
-  return data.sessions.find(s => s.date === todayStr() && s.dayId === dayId) || null;
+function workingSession(dayId, date){
+  date = date || todayStr();
+  return data.sessions.find(s => s.date === date && s.dayId === dayId) || null;
 }
 
-function ensureWorkingSession(dayId){
-  let s = workingSession(dayId);
-  if(!s){ s = { date: todayStr(), dayId, entries: [] }; data.sessions.push(s); }
+function ensureWorkingSession(dayId, date){
+  date = date || todayStr();
+  let s = workingSession(dayId, date);
+  if(!s){ s = { date, dayId, entries: [] }; data.sessions.push(s); }
   return s;
 }
 
@@ -485,8 +493,8 @@ function computePrefill(ex, excludeSession){
   return { weight: last.weight, reps, progressed: false, last };
 }
 
-function writeEntry(dayId, ex, weight, reps, done){
-  const s = ensureWorkingSession(dayId);
+function writeEntry(dayId, ex, weight, reps, done, date){
+  const s = ensureWorkingSession(dayId, date);
   let e = s.entries.find(e => e.exerciseId === ex.id);
   if(!e){ e = { exerciseId: ex.id }; s.entries.push(e); }
   e.weight = weight;
@@ -495,8 +503,8 @@ function writeEntry(dayId, ex, weight, reps, done){
   scheduleSave();
 }
 
-function removeEntry(dayId, exId){
-  const s = workingSession(dayId);
+function removeEntry(dayId, exId, date){
+  const s = workingSession(dayId, date);
   if(!s) return;
   const i = s.entries.findIndex(e => e.exerciseId === exId);
   if(i >= 0) s.entries.splice(i, 1);
@@ -528,9 +536,10 @@ function updateSyncDot(){
   $syncDot.title = offline ? 'Offline — writes queued' : (store.dirty ? 'Unsynced changes' : 'Synced');
 }
 
-function go(view, dayId){
+function go(view, dayId, sessionDate){
   currentView = view;
   currentDayId = dayId || null;
+  currentSessionDate = sessionDate || null;
   render();
   window.scrollTo(0, 0);
 }
@@ -597,7 +606,27 @@ function renderSession(){
   const day = getDay(currentDayId);
   if(!day){ go('home'); return; }
   $title.textContent = day.name;
-  const ws = workingSession(day.id);
+  const editDate = currentSessionDate;
+  const ws = workingSession(day.id, editDate);
+
+  if(editDate){
+    const note = el('div','sessnote editing');
+    note.appendChild(el('span', null, 'Editing ' + fmtDate(editDate) + ' — changes sync like normal'));
+    const back = el('button','linkbtn','Back to today →');
+    back.onclick = () => go('session', day.id);
+    note.appendChild(back);
+    $view.appendChild(note);
+  }else{
+    const last = lastSessionDate(day.id);
+    if(last && last !== todayStr()){
+      const note = el('div','sessnote');
+      note.appendChild(el('span', null, 'Spot a mistake?'));
+      const edit = el('button','linkbtn','Fix last session (' + fmtDate(last) + ') →');
+      edit.onclick = () => go('session', day.id, last);
+      note.appendChild(edit);
+      $view.appendChild(note);
+    }
+  }
 
   // group consecutive exercises that share a superset id
   const groups = [];
@@ -725,13 +754,13 @@ function exerciseCard(day, ex, ws){
     commit(true);
   };
   const clearBtn = el('button','clearbtn','Clear');
-  clearBtn.onclick = () => { removeEntry(day.id, ex.id); render(); };
+  clearBtn.onclick = () => { removeEntry(day.id, ex.id, currentSessionDate); render(); };
   btnrow.appendChild(doneBtn); btnrow.appendChild(clearBtn);
   card.appendChild(btnrow);
 
   function commit(fromDone){
     state.touched = true;
-    writeEntry(day.id, ex, state.weight, state.reps, state.done);
+    writeEntry(day.id, ex, state.weight, state.reps, state.done, currentSessionDate);
     if(!fromDone) updateSyncDot();
   }
 
