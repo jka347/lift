@@ -86,15 +86,16 @@ Notes:
 2. **Session:** exercise list in program order, supersets visually grouped (shared border/label). Each exercise row shows:
    - Name, target `sets × repLow–repHigh`
    - **Last session line: weight × reps from most recent session containing this exercise** (e.g., "45 lb — 10/9/8/8")
-   - Weight input (prefilled with last weight) + one rep input per set (prefilled with last reps, tap to adjust). Steppers or number pads; must be thumb-friendly.
+   - Weight input (prefilled with last weight, with a subtle one-decimal kg conversion beneath lb) + one rep input per set. Rep inputs start visibly empty so they cannot be mistaken for completed work; the first `+` tap fills that set's suggested starting value (normally its reps from the last workout), and later taps increment it. Steppers or number pads; must be thumb-friendly.
    - **Progression flag:** if last session hit `repHigh` on ALL sets → show "⬆ Add weight" badge and prefill weight +5 lb.
    - A "done" state per exercise; session auto-saves per entry (writes queued/debounced ~10s to limit API calls).
 3. **Settings:** PAT entry, gist status, units, "Export JSON" (download current data), raw program JSON editor (textarea + validate + save).
 
 ## Double-progression logic (the core feature)
 - For each exercise, find the most recent session entry.
+- The same lift shares history across routine days when its normalized name, rep range, unit, and per-side mode match, even if each day uses a different exercise ID or number of sets. A different rep range remains a separate progression track.
 - If `min(reps) >= repHigh` → progression triggered: badge + suggest `weight + 5` (lb).
-- Otherwise → prefill same weight, prefill last reps.
+- Otherwise → prefill the same weight; keep reps visibly empty and use the last reps as each set's first-`+` suggestion.
 - **First exercise ever (no history) → prefill `startWeight`** from the program data; no badge.
 - No streak tracking, no charts in v1. (Nice-to-have later: per-exercise history list.)
 

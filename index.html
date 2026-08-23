@@ -100,6 +100,7 @@
   .weightrow{display:flex; align-items:center; gap:10px; margin-top:12px;}
   .weightrow .val{flex:1; text-align:center; font-size:26px; font-weight:700; padding:4px 0; user-select:none;}
   .weightrow .val small{font-size:14px; color:var(--dim); font-weight:400;}
+  .weightrow .val .kg{display:block; margin-top:1px; color:var(--dim); font-size:12px; font-weight:400; line-height:1.1;}
   .step{background:var(--card2); border:1px solid var(--line); color:var(--text); border-radius:12px;
     font-size:26px; font-weight:600; width:64px; height:52px; cursor:pointer; flex:none;}
   .step:active{background:var(--line);}
@@ -308,6 +309,7 @@ function progressWeight(w){
   for(const v of weightLadder()) if(v >= target - 0.01) return v;
   return nextWeight(w);
 }
+function kgForLb(lb){ return (Number(lb) / 2.2046226218).toFixed(1); }
 
 /* ============ storage helpers ============ */
 const store = {
@@ -525,13 +527,35 @@ function ensureWorkingSession(dayId, date){
   return s;
 }
 
+function sameHistoryLift(a, b){
+  const name = ex => String(ex.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  return name(a) === name(b)
+    && a.repLow === b.repLow
+    && a.repHigh === b.repHigh
+    && (a.unit || 'reps') === (b.unit || 'reps')
+    && !!a.perSide === !!b.perSide;
+}
+
+// Resolve a session's day-specific exercise ID through its definition so the
+// same lift and rep target can share history across different routine days.
 // Only entries marked done count as history — stepper taps alone are scratch.
-function lastEntryFor(exId, excludeSession){
+function loggedEntryFor(session, ex){
+  const day = getDay(session.dayId);
+  if(!day) return null;
+  for(const sessionEx of day.exercises){
+    if(!sameHistoryLift(sessionEx, ex)) continue;
+    const entry = session.entries.find(e => e.exerciseId === sessionEx.id);
+    if(entry && entry.done && Array.isArray(entry.reps) && entry.reps.length) return entry;
+  }
+  return null;
+}
+
+function lastEntryFor(ex, excludeSession){
   const sorted = [...data.sessions].sort((a,b) => a.date < b.date ? 1 : -1);
   for(const s of sorted){
     if(s === excludeSession) continue;
-    const e = s.entries.find(e => e.exerciseId === exId);
-    if(e && e.done && Array.isArray(e.reps) && e.reps.length) return e;
+    const e = loggedEntryFor(s, ex);
+    if(e) return e;
   }
   return null;
 }
@@ -553,7 +577,7 @@ function pruneScratchSessions(){
 
 // Double progression: last session hit repHigh on ALL sets → +5 lb.
 function computePrefill(ex, excludeSession){
-  const last = lastEntryFor(ex.id, excludeSession);
+  const last = lastEntryFor(ex, excludeSession);
   if(!last){
     return { weight: ex.startWeight, reps: Array(ex.sets).fill(null), progressed: false, last: null };
   }
@@ -690,10 +714,10 @@ function renderOverview(){
     for(const ex of day.exercises){
       const row = el('div','ovrow');
       const name = el('div','ovname', ex.name + (ex.perSide ? ' / side' : ''));
-      const last = lastEntryFor(ex.id, null);
+      const last = lastEntryFor(ex, null);
       const lastDate = (() => {
         const sorted = [...data.sessions].sort((a,b) => a.date < b.date ? 1 : -1);
-        const s = sorted.find(s => s.entries.some(e => e.exerciseId === ex.id && e.done && e.reps && e.reps.length));
+        const s = sorted.find(s => loggedEntryFor(s, ex));
         return s ? s.date : null;
       })();
       name.appendChild(el('span','sub', lastDate ? 'Last done ' + fmtDate(lastDate) : 'Not done yet'));
@@ -717,7 +741,7 @@ function renderOverview(){
           const sorted = [...data.sessions].sort((a,b) => a.date < b.date ? 1 : -1);
           let any = false;
           for(const s of sorted){
-            const e = s.entries.find(e => e.exerciseId === ex.id && e.done && e.reps && e.reps.length);
+            const e = loggedEntryFor(s, ex);
             if(!e) continue;
             any = true;
             const h = el('div','hrow');
@@ -786,12 +810,13 @@ function exerciseCard(day, ex, ws){
   const unit = ex.unit === 'sec' ? 'sec' : 'reps';
   const repStep = unit === 'sec' ? 5 : 1;
 
-  // live card state: today's entry if present, else prefill
+  // Live card state: restore saved work, but leave a new workout visibly blank.
+  // `pre.reps` remains the per-set suggestion used by the first + tap.
   const state = {
     weight: existing ? existing.weight : pre.weight,
     reps: existing
       ? Array.from({length: ex.sets}, (_, i) => existing.reps[i] != null ? existing.reps[i] : null)
-      : pre.reps.slice(),
+      : Array(ex.sets).fill(null),
     done: !!(existing && existing.done),
     touched: !!existing
   };
@@ -839,6 +864,7 @@ function exerciseCard(day, ex, ws){
   const wplus = el('button','step','+');
   function paintWeight(){
     wval.innerHTML = esc(state.weight) + ' <small>' + esc(data.settings.units) + '</small>';
+    if(data.settings.units === 'lb') wval.innerHTML += '<span class="kg">' + kgForLb(state.weight) + ' kg</span>';
   }
   paintWeight();
   wminus.onclick = () => { state.weight = prevWeight(state.weight); paintWeight(); commit(); };
@@ -857,11 +883,17 @@ function exerciseCard(day, ex, ws){
     const plus = el('button','ministep','+');
     repEls.push(rep);
     minus.onclick = () => {
+      if(state.reps[i] == null) return;
       // stepping below 0 blanks the set again
-      state.reps[i] = state.reps[i] == null ? ex.repLow : (state.reps[i] - repStep < 0 ? null : state.reps[i] - repStep);
+      state.reps[i] = state.reps[i] - repStep < 0 ? null : state.reps[i] - repStep;
       paintRep(i); commit(); startRest(restFor(ex));
     };
-    plus.onclick = () => { state.reps[i] = state.reps[i] == null ? ex.repLow : state.reps[i] + repStep; paintRep(i); commit(); startRest(restFor(ex)); };
+    plus.onclick = () => {
+      state.reps[i] = state.reps[i] == null
+        ? (pre.reps[i] != null ? pre.reps[i] : ex.repLow)
+        : state.reps[i] + repStep;
+      paintRep(i); commit(); startRest(restFor(ex));
+    };
     cell.appendChild(minus); cell.appendChild(rep); cell.appendChild(plus);
     grid.appendChild(cell);
   }
@@ -876,8 +908,11 @@ function exerciseCard(day, ex, ws){
   const btnrow = el('div','btnrow');
   const doneBtn = el('button','donebtn' + (state.done ? ' on' : ''), state.done ? '✓ Logged' : 'Log ✓');
   doneBtn.onclick = () => {
+    if(!state.done && state.reps.every(r => r == null)){
+      showBanner('Add reps for at least one set before logging this exercise.', true);
+      return;
+    }
     state.done = !state.done;
-    if(state.done && state.reps.every(r => r == null)) state.reps = state.reps.map((_, i) => pre.reps[i]);
     for(let i = 0; i < ex.sets; i++) paintRep(i);
     doneBtn.textContent = state.done ? '✓ Logged' : 'Log ✓';
     doneBtn.classList.toggle('on', state.done);
