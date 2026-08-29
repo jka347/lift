@@ -20,7 +20,7 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
 ## Data model (the gist JSON)
 ```json
 {
-  "version": 1,
+  "version": 3,
   "updated_at": "2026-08-16T15:04:05Z",
   "settings": { "units": "lb" },
   "program": {
@@ -30,10 +30,10 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
         "name": "Upper A — Chest & Shoulders",
         "exercises": [
           { "id": "bench", "startWeight": 45,   "name": "DB Bench Press",            "sets": 4, "repLow": 6,  "repHigh": 10, "perSide": false, "superset": null },
-          { "id": "ohp", "startWeight": 20,     "name": "DB Overhead Press",          "sets": 3, "repLow": 8,  "repHigh": 12, "perSide": false, "superset": null },
+          { "id": "ohp", "startWeight": 20,     "name": "DB Overhead Press",          "sets": 3, "repLow": 8,  "repHigh": 12, "perSide": false, "superset": null, "increment": 2.5 },
           { "id": "incline", "startWeight": 35, "name": "Incline DB Bench",           "sets": 3, "repLow": 8,  "repHigh": 12, "perSide": false, "superset": "ss1" },
           { "id": "row", "startWeight": 45,     "name": "One-Arm Row",                "sets": 3, "repLow": 8,  "repHigh": 12, "perSide": true,  "superset": "ss1" },
-          { "id": "latraise", "startWeight": 10,"name": "Lateral Raises",             "sets": 3, "repLow": 12, "repHigh": 15, "perSide": false, "superset": "ss2" },
+          { "id": "latraise", "startWeight": 10,"name": "Lateral Raises",             "sets": 3, "repLow": 12, "repHigh": 15, "perSide": false, "superset": "ss2", "increment": 2.5 },
           { "id": "curl", "startWeight": 20,    "name": "DB Curls",                   "sets": 3, "repLow": 12, "repHigh": 15, "perSide": false, "superset": "ss2" },
           { "id": "triext", "startWeight": 25,  "name": "Overhead Triceps Extension", "sets": 3, "repLow": 10, "repHigh": 12, "perSide": false, "superset": "ss3" },
           { "id": "hammer", "startWeight": 25,  "name": "Hammer Curls",               "sets": 3, "repLow": 10, "repHigh": 12, "perSide": false, "superset": "ss3" }
@@ -44,24 +44,24 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
           { "id": "bench2", "startWeight": 40,   "name": "DB Bench Press",        "sets": 3, "repLow": 8,  "repHigh": 12 },
           { "id": "csrow", "startWeight": 30,    "name": "Chest-Supported Row",   "sets": 3, "repLow": 10, "repHigh": 12, "superset": "ss1" },
           { "id": "pullover", "startWeight": 30, "name": "DB Pullover",           "sets": 3, "repLow": 10, "repHigh": 12, "superset": "ss1" },
-          { "id": "seatpress", "startWeight": 20,"name": "Seated DB Press",       "sets": 3, "repLow": 10, "repHigh": 15, "superset": "ss2" },
-          { "id": "reardelt", "startWeight": 10, "name": "Rear Delt Flyes",       "sets": 3, "repLow": 10, "repHigh": 15, "superset": "ss2" },
+          { "id": "seatpress", "startWeight": 20,"name": "Seated DB Press",       "sets": 3, "repLow": 10, "repHigh": 15, "superset": "ss2", "increment": 2.5 },
+          { "id": "reardelt", "startWeight": 10, "name": "Rear Delt Flyes",       "sets": 3, "repLow": 10, "repHigh": 15, "superset": "ss2", "increment": 2.5 },
           { "id": "curl2", "startWeight": 25,    "name": "DB Curls",              "sets": 3, "repLow": 8,  "repHigh": 12, "superset": "ss3" },
           { "id": "skull", "startWeight": 15,    "name": "Skull Crushers",        "sets": 3, "repLow": 8,  "repHigh": 12, "superset": "ss3" }
       ]},
       { "id": "lowerA", "name": "Lower + Core", "exercises": [
           { "id": "rdl", "startWeight": 45,     "name": "Romanian Deadlift",      "sets": 4, "repLow": 8,  "repHigh": 10 },
           { "id": "goblet", "startWeight": 45,  "name": "Goblet Squat",           "sets": 3, "repLow": 10, "repHigh": 12 },
-          { "id": "kbswing", "startWeight": 20, "name": "KB Swings",              "sets": 3, "repLow": 30, "repHigh": 50 },
+          { "id": "kbswing", "startWeight": 20, "name": "KB Swings",              "sets": 3, "repLow": 20, "repHigh": 50, "increment": 15 },
           { "id": "wsitup", "startWeight": 10,  "name": "Weighted Sit-Ups",       "sets": 3, "repLow": 10, "repHigh": 15 },
           { "id": "legraise", "startWeight": 0,"name": "Bench Leg Raises",       "sets": 3, "repLow": 10, "repHigh": 15 }
       ]},
       { "id": "lowerB", "name": "Lower + Core B", "exercises": [
           { "id": "rdlheavy", "startWeight": 50,"name": "RDL (heavy)",            "sets": 4, "repLow": 6,  "repHigh": 8 },
           { "id": "hipthrust", "startWeight": 50,"name": "Hip Thrust",            "sets": 3, "repLow": 10, "repHigh": 12 },
-          { "id": "tgu", "startWeight": 20,     "name": "Turkish Get-Up",         "sets": 3, "repLow": 3,  "repHigh": 3,  "perSide": true },
+          { "id": "ohcarry", "startWeight": 20, "name": "Overhead Carry",         "sets": 3, "repLow": 30, "repHigh": 45, "perSide": true, "unit": "sec", "superset": "ssC", "supersetNote": "Overhead L → suitcase R → overhead R → suitcase L. One implement at a time; minimal rest between trips." },
           { "id": "twist", "startWeight": 20,   "name": "KB Russian Twists",      "sets": 3, "repLow": 12, "repHigh": 16 },
-          { "id": "carry", "startWeight": 45,   "name": "Suitcase Carry (heavy)", "sets": 3, "repLow": 30, "repHigh": 30, "perSide": true, "unit": "sec" }
+          { "id": "carry", "startWeight": 45,   "name": "Suitcase Carry (heavy)", "sets": 3, "repLow": 30, "repHigh": 45, "perSide": true, "unit": "sec", "superset": "ssC" }
       ]}
     ]
   },
@@ -88,14 +88,14 @@ Notes:
    - **Last session line: weight × reps from most recent session containing this exercise** (e.g., "45 lb — 10/9/8/8")
    - Weight input (prefilled with last weight, with a subtle one-decimal kg conversion beneath lb) + one rep input per set. Rep inputs start visibly empty so they cannot be mistaken for completed work; the first `+` tap fills that set's suggested starting value (normally its reps from the last workout), and later taps increment it. Steppers or number pads; must be thumb-friendly.
    - Exercises measured in seconds show a small per-set Start Timer button. It uses that set's entered duration, displays the countdown, and signals completion in-app plus vibration and an Android notification when permission is available. Adjusting seconds does not start the normal rest timer.
-   - **Progression flag:** if last session hit `repHigh` on ALL sets → show "⬆ Add weight" badge and prefill weight +5 lb.
+   - **Progression flag:** if last session hit `repHigh` on ALL sets → show "⬆ Add weight" badge and prefill the next owned weight near the exercise's optional `increment` (default +5 lb). This applies to both rep- and seconds-based exercises.
    - A "done" state per exercise; session auto-saves per entry (writes queued/debounced ~10s to limit API calls).
 3. **Settings:** PAT entry, gist status, units, "Export JSON" (download current data), raw program JSON editor (textarea + validate + save).
 
 ## Double-progression logic (the core feature)
 - For each exercise, find the most recent session entry.
 - The same lift shares history across routine days when its normalized name, rep range, unit, and per-side mode match, even if each day uses a different exercise ID or number of sets. A different rep range remains a separate progression track.
-- If `min(reps) >= repHigh` → progression triggered: badge + suggest `weight + 5` (lb).
+- If `min(reps) >= repHigh` → progression triggered: badge + suggest the next owned weight near `increment` (default 5 lb). Small isolation lifts use `increment: 2.5`; timed carries use the same progression logic.
 - Otherwise → prefill the same weight; keep reps visibly empty and use the last reps as each set's first-`+` suggestion.
 - **First exercise ever (no history) → prefill `startWeight`** from the program data; no badge.
 - No streak tracking, no charts in v1. (Nice-to-have later: per-exercise history list.)
@@ -125,8 +125,8 @@ Derived from actual recent working loads (home + travel sessions) and conservati
 | RDL heavy (6–8) | 50/hand | Strength slot, small step above |
 | Goblet Squat (single DB) | 45 | 48 proven; knee-first, tempo before load |
 | Hip Thrust (single DB on hips) | 50 | Glutes are strong; this feels light fast — climb quickly |
-| KB Swings | 20 | The KB you own; upgrade to 35–50 once the pattern clicks |
-| Turkish Get-Up | 20 | Learn with the 20 lb KB (or lighter/none first session) |
+| KB Swings | 20 | Conditioning/power slot; build to 3×50, then use a 35 lb bell or one-arm swings rather than a nominal +5 lb adjustment |
+| Overhead Carry | 20 | The available KB; shoulder stability without the TGU learning curve or kneeling transition |
 | KB Russian Twists | 20 | The KB you own |
 | Weighted Sit-Ups (DB on chest) | 10 | Ab loading should start light and progress like a lift |
 | Bench Leg Raises | 0 | Bodyweight; add ankle weight/DB between feet later |
