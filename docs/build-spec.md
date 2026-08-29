@@ -52,7 +52,7 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
       { "id": "lowerA", "name": "Lower + Core", "exercises": [
           { "id": "rdl", "startWeight": 45,     "name": "Romanian Deadlift",      "sets": 4, "repLow": 8,  "repHigh": 10 },
           { "id": "goblet", "startWeight": 45,  "name": "Goblet Squat",           "sets": 3, "repLow": 10, "repHigh": 12 },
-          { "id": "kbswing", "startWeight": 20, "name": "KB Swings",              "sets": 3, "repLow": 15, "repHigh": 20 },
+          { "id": "kbswing", "startWeight": 20, "name": "KB Swings",              "sets": 3, "repLow": 30, "repHigh": 50 },
           { "id": "wsitup", "startWeight": 10,  "name": "Weighted Sit-Ups",       "sets": 3, "repLow": 10, "repHigh": 15 },
           { "id": "legraise", "startWeight": 0,"name": "Bench Leg Raises",       "sets": 3, "repLow": 10, "repHigh": 15 }
       ]},
@@ -87,6 +87,7 @@ Notes:
    - Name, target `sets × repLow–repHigh`
    - **Last session line: weight × reps from most recent session containing this exercise** (e.g., "45 lb — 10/9/8/8")
    - Weight input (prefilled with last weight, with a subtle one-decimal kg conversion beneath lb) + one rep input per set. Rep inputs start visibly empty so they cannot be mistaken for completed work; the first `+` tap fills that set's suggested starting value (normally its reps from the last workout), and later taps increment it. Steppers or number pads; must be thumb-friendly.
+   - Exercises measured in seconds show a small per-set Start Timer button. It uses that set's entered duration, displays the countdown, and signals completion in-app plus vibration and an Android notification when permission is available. Adjusting seconds does not start the normal rest timer.
    - **Progression flag:** if last session hit `repHigh` on ALL sets → show "⬆ Add weight" badge and prefill weight +5 lb.
    - A "done" state per exercise; session auto-saves per entry (writes queued/debounced ~10s to limit API calls).
 3. **Settings:** PAT entry, gist status, units, "Export JSON" (download current data), raw program JSON editor (textarea + validate + save).
@@ -134,6 +135,7 @@ Derived from actual recent working loads (home + travel sessions) and conservati
 ## UX requirements
 - Mobile-first, dark theme, system font stack, no icons/libraries needed.
 - Everything reachable in ≤2 taps from open.
+- Android/system Back and the header back arrow navigate through internal app views before the PWA exits.
 - Inputs: large steppers (+/−) preferred over keyboards mid-workout.
 - Works offline for logging (queued sync).
 - No login besides the one-time PAT paste per device.

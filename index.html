@@ -113,6 +113,10 @@
   .ministep{background:var(--card); border:1px solid var(--line); color:var(--text); border-radius:9px;
     font-size:20px; width:44px; height:44px; cursor:pointer; flex:none;}
   .ministep:active{background:var(--line);}
+  .setcell.timed{flex-wrap:wrap;}
+  .settimer{flex-basis:100%; padding:6px 8px; background:none; border:1px solid var(--line);
+    border-radius:8px; color:var(--dim); font-size:12px; font-weight:600; cursor:pointer;}
+  .settimer:active{background:var(--card); color:var(--text);}
   .btnrow{display:flex; gap:8px; margin-top:12px;}
   .donebtn{flex:1; padding:13px; font-size:16px; font-weight:700;
     border-radius:12px; border:1px solid var(--line); background:var(--card2); color:var(--text); cursor:pointer;}
@@ -148,7 +152,8 @@
   #restbar{position:fixed; left:0; right:0; bottom:0; z-index:20; display:flex; align-items:center;
     justify-content:center; gap:14px; padding:14px 16px calc(env(safe-area-inset-bottom) + 14px);
     background:var(--card2); border-top:1px solid var(--line); cursor:pointer; user-select:none;}
-  #restbar .lbl{color:var(--dim); font-size:15px;}
+  #restbar .lbl{max-width:42%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    color:var(--dim); font-size:15px;}
   #restbar b{font-size:26px; font-variant-numeric:tabular-nums;}
   #restbar .hint{color:var(--dim); font-size:12px;}
   #restbar.done{background:var(--accent-dim); border-top-color:var(--accent-dim);}
@@ -172,7 +177,7 @@
 </header>
 <div id="banner" class="hidden"><span id="bannerText"></span><button id="bannerClose" aria-label="Dismiss">×</button></div>
 <main id="view"></main>
-<div id="restbar" class="hidden"><span class="lbl">Rest</span><b id="restTime">1:30</b><span class="hint">tap to dismiss</span></div>
+<div id="restbar" class="hidden"><span id="timerLabel" class="lbl">Rest</span><b id="restTime">1:30</b><span class="hint">tap to dismiss</span></div>
 
 <script>
 'use strict';
@@ -189,7 +194,7 @@ const DEFAULT_WEIGHTS = [0, 5, 10, 12, 15, 17.5, 20, 25, 27.5, 30, 35, 37.5, 40,
   45, 47.5, 50, 55, 57.5, 60, 65, 67.5, 70, 75, 77.5, 80, 85, 87.5, 90];
 
 const DEFAULT_DATA = {
-  version: 1,
+  version: 2,
   updated_at: null,
   settings: { units: 'lb', weights: DEFAULT_WEIGHTS },
   program: { days: [
@@ -216,7 +221,7 @@ const DEFAULT_DATA = {
     { id:'lowerA', name:'Lower + Core', exercises:[
       { id:'rdl',      startWeight:45, name:'Romanian Deadlift', sets:4, repLow:8,  repHigh:10 },
       { id:'goblet',   startWeight:45, name:'Goblet Squat',      sets:3, repLow:10, repHigh:12 },
-      { id:'kbswing',  startWeight:20, name:'KB Swings',         sets:3, repLow:15, repHigh:20 },
+      { id:'kbswing',  startWeight:20, name:'KB Swings',         sets:3, repLow:30, repHigh:50 },
       { id:'wsitup',   startWeight:10, name:'Weighted Sit-Ups',  sets:3, repLow:10, repHigh:15 },
       { id:'legraise', startWeight:0,  name:'Bench Leg Raises',  sets:3, repLow:10, repHigh:15 }
     ]},
@@ -279,6 +284,15 @@ function ensureFormGuides(){
       if(ex.rest == null && defEx.rest != null){ ex.rest = defEx.rest; changed = true; }
     }
   }
+  // v2 raises Jeff's existing Lower A kettlebell swing target from 15–20 to
+  // 30–50. Versioning makes this a one-time migration so later JSON edits win.
+  if((data.version || 1) < 2){
+    const lowerA = data.program.days.find(d => d.id === 'lowerA');
+    const swings = lowerA && lowerA.exercises.find(e => e.id === 'kbswing');
+    if(swings){ swings.repLow = 30; swings.repHigh = 50; }
+    data.version = 2;
+    changed = true;
+  }
   if(!Array.isArray(data.settings.weights) || !data.settings.weights.length){
     data.settings.weights = DEFAULT_WEIGHTS;
     changed = true;
@@ -334,6 +348,7 @@ let data = null;
 let currentView = 'home';   // 'home' | 'session' | 'overview' | 'settings' | 'setup'
 let currentDayId = null;
 let currentSessionDate = null; // null = today; a date = editing that past session
+let navigationReady = false;
 let saveTimer = null;
 let offline = false;
 let syncing = false;
@@ -610,14 +625,17 @@ function removeEntry(dayId, exId, date){
 
 /* ============ rest timer ============ */
 const $restbar = document.getElementById('restbar');
+const $timerLabel = document.getElementById('timerLabel');
 const $restTime = document.getElementById('restTime');
-let restEnd = 0, restInt = null;
+let restEnd = 0, restInt = null, timerDoneMessage = null;
 
 function restFor(ex){ return ex.rest || (ex.superset ? 60 : 90); }
 
-function startRest(secs){
+function startCountdown(secs, label, doneMessage){
   if(currentView !== 'session' || currentSessionDate) return; // not when editing history
   restEnd = Date.now() + secs * 1000;
+  timerDoneMessage = doneMessage || null;
+  $timerLabel.textContent = label;
   document.body.classList.add('resting');
   $restbar.classList.remove('hidden');
   $restbar.classList.remove('done');
@@ -626,13 +644,41 @@ function startRest(secs){
   tickRest();
 }
 
+function startRest(secs){ startCountdown(secs, 'Rest', null); }
+
+function startSetTimer(secs, ex, setNumber){
+  if('Notification' in window && Notification.permission === 'default'){
+    Notification.requestPermission().catch(() => {});
+  }
+  const label = ex.name + ' · S' + setNumber;
+  startCountdown(secs, label, ex.name + ' set ' + setNumber + ' is done.');
+}
+
+function notifyTimerDone(message){
+  showBanner(message);
+  if(navigator.vibrate) navigator.vibrate([250, 100, 250, 100, 400]);
+  if('Notification' in window && Notification.permission === 'granted' && navigator.serviceWorker){
+    navigator.serviceWorker.ready.then(registration => registration.showNotification('Lift timer done', {
+      body: message,
+      icon: './icon-512.png',
+      tag: 'lift-set-timer'
+    })).catch(() => {});
+  }
+}
+
 function tickRest(){
   const left = Math.ceil((restEnd - Date.now()) / 1000);
   if(left <= 0){
     $restTime.textContent = 'Go!';
     $restbar.classList.add('done');
     clearInterval(restInt); restInt = null;
-    if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    if(timerDoneMessage){
+      const message = timerDoneMessage;
+      timerDoneMessage = null;
+      notifyTimerDone(message);
+    }else if(navigator.vibrate){
+      navigator.vibrate([200, 100, 200]);
+    }
   }else{
     $restTime.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
   }
@@ -640,6 +686,7 @@ function tickRest(){
 
 function stopRest(){
   clearInterval(restInt); restInt = null;
+  timerDoneMessage = null;
   $restbar.classList.add('hidden');
   document.body.classList.remove('resting');
 }
@@ -654,8 +701,12 @@ const $syncDot = document.getElementById('syncDot');
 const $banner = document.getElementById('banner');
 const $bannerText = document.getElementById('bannerText');
 
-$back.onclick = () => { flushSave(); go('home'); };
-$settingsBtn.onclick = () => go(currentView === 'settings' ? 'home' : 'settings');
+function navigateBack(){
+  window.history.back();
+}
+
+$back.onclick = navigateBack;
+$settingsBtn.onclick = () => currentView === 'settings' ? navigateBack() : go('settings');
 document.getElementById('bannerClose').onclick = () => $banner.classList.add('hidden');
 
 function showBanner(msg, isError){
@@ -669,14 +720,34 @@ function updateSyncDot(){
   $syncDot.title = offline ? 'Offline — writes queued' : (store.dirty ? 'Unsynced changes' : 'Synced');
 }
 
-function go(view, dayId, sessionDate){
-  currentView = view;
-  currentDayId = dayId || null;
-  currentSessionDate = sessionDate || null;
+function go(view, dayId, sessionDate, options){
+  const route = {
+    liftRoute: true,
+    view,
+    dayId: dayId || null,
+    sessionDate: sessionDate || null
+  };
+  options = options || {};
+  if(!options.fromHistory){
+    if(!navigationReady || options.replace) window.history.replaceState(route, '');
+    else window.history.pushState(route, '');
+  }
+  navigationReady = true;
+  currentView = route.view;
+  currentDayId = route.dayId;
+  currentSessionDate = route.sessionDate;
   stopRest();
   render();
   window.scrollTo(0, 0);
 }
+
+window.addEventListener('popstate', event => {
+  flushSave();
+  const route = event.state && event.state.liftRoute
+    ? event.state
+    : { view:'home', dayId:null, sessionDate:null };
+  go(route.view, route.dayId, route.sessionDate, { fromHistory:true });
+});
 
 function render(){
   $view.textContent = '';
@@ -762,7 +833,7 @@ function renderOverview(){
 
 function renderSession(){
   const day = getDay(currentDayId);
-  if(!day){ go('home'); return; }
+  if(!day){ go('home', null, null, { replace:true }); return; }
   $title.textContent = day.name;
   const editDate = currentSessionDate;
   const ws = workingSession(day.id, editDate);
@@ -771,7 +842,7 @@ function renderSession(){
     const note = el('div','sessnote editing');
     note.appendChild(el('span', null, 'Editing ' + fmtDate(editDate) + ' — changes sync like normal'));
     const back = el('button','linkbtn','Back to today →');
-    back.onclick = () => go('session', day.id);
+    back.onclick = navigateBack;
     note.appendChild(back);
     $view.appendChild(note);
   }else{
@@ -876,7 +947,7 @@ function exerciseCard(day, ex, ws){
   const grid = el('div','setgrid');
   const repEls = [];
   for(let i = 0; i < ex.sets; i++){
-    const cell = el('div','setcell');
+    const cell = el('div','setcell' + (unit === 'sec' ? ' timed' : ''));
     cell.appendChild(el('span','lbl','S' + (i+1)));
     const minus = el('button','ministep','−');
     const rep = el('span','rep');
@@ -886,15 +957,32 @@ function exerciseCard(day, ex, ws){
       if(state.reps[i] == null) return;
       // stepping below 0 blanks the set again
       state.reps[i] = state.reps[i] - repStep < 0 ? null : state.reps[i] - repStep;
-      paintRep(i); commit(); startRest(restFor(ex));
+      paintRep(i); commit();
+      if(unit !== 'sec') startRest(restFor(ex));
     };
     plus.onclick = () => {
       state.reps[i] = state.reps[i] == null
         ? (pre.reps[i] != null ? pre.reps[i] : ex.repLow)
         : state.reps[i] + repStep;
-      paintRep(i); commit(); startRest(restFor(ex));
+      paintRep(i); commit();
+      if(unit !== 'sec') startRest(restFor(ex));
     };
     cell.appendChild(minus); cell.appendChild(rep); cell.appendChild(plus);
+    if(unit === 'sec' && !currentSessionDate){
+      const timer = el('button','settimer','▶ Start timer');
+      timer.onclick = () => {
+        if(state.reps[i] == null){
+          state.reps[i] = pre.reps[i] != null ? pre.reps[i] : ex.repLow;
+          paintRep(i); commit();
+        }
+        if(state.reps[i] <= 0){
+          showBanner('Set the timer above 0 seconds first.', true);
+          return;
+        }
+        startSetTimer(state.reps[i], ex, i + 1);
+      };
+      cell.appendChild(timer);
+    }
     grid.appendChild(cell);
   }
   function paintRep(i){
@@ -1094,7 +1182,7 @@ function renderSetup(extraMsg){
     store.pat = v;
     try{
       await hydrate();
-      go('home');
+      go('home', null, null, { replace:true });
     }catch(e){
       if(e instanceof AuthError) store.pat = '';
       err.textContent = e instanceof AuthError ? 'Token rejected by GitHub. Check it has the Gists permission.' : 'Could not reach GitHub: ' + e.message;
@@ -1135,7 +1223,7 @@ async function init(){
         showBanner('GitHub token rejected — update it in Settings. Local data is intact.', true);
       }else{
         store.pat = '';
-        go('setup');
+        go('setup', null, null, { replace:true });
         renderSetupError();
       }
     }else{
