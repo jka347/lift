@@ -178,7 +178,7 @@
 </header>
 <div id="banner" class="hidden"><span id="bannerText"></span><button id="bannerClose" aria-label="Dismiss">×</button></div>
 <main id="view"></main>
-<div id="restbar" class="hidden"><span id="timerLabel" class="lbl">Rest</span><b id="restTime">1:30</b><span class="hint">tap to dismiss</span></div>
+<div id="restbar" class="hidden"><span id="timerLabel" class="lbl">Rest</span><b id="restTime">1:30</b><span id="timerHint" class="hint">tap to dismiss</span></div>
 
 <script>
 'use strict';
@@ -730,31 +730,48 @@ function removeEntry(dayId, exId, date){
 const $restbar = document.getElementById('restbar');
 const $timerLabel = document.getElementById('timerLabel');
 const $restTime = document.getElementById('restTime');
-let restEnd = 0, restInt = null, timerDoneMessage = null;
+const $timerHint = document.getElementById('timerHint');
+let timerEnd = 0, timerStarted = 0, timerLimit = 0, timerInt = null;
+let timerMode = null, timerDoneMessage = null, timerOnStop = null;
 
 function restFor(ex){ return ex.rest || (ex.superset ? 60 : 90); }
+function formatTimer(secs){ return Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0'); }
 
-function startCountdown(secs, label, doneMessage){
+function startCountdown(secs, label){
   if(currentView !== 'session' || currentSessionDate) return; // not when editing history
-  restEnd = Date.now() + secs * 1000;
-  timerDoneMessage = doneMessage || null;
+  stopRest();
+  timerMode = 'down';
+  timerEnd = Date.now() + secs * 1000;
   $timerLabel.textContent = label;
+  $timerHint.textContent = 'tap to dismiss';
   document.body.classList.add('resting');
   $restbar.classList.remove('hidden');
   $restbar.classList.remove('done');
-  clearInterval(restInt);
-  restInt = setInterval(tickRest, 250);
-  tickRest();
+  timerInt = setInterval(tickTimer, 250);
+  tickTimer();
 }
 
-function startRest(secs){ startCountdown(secs, 'Rest', null); }
+function startRest(secs){ startCountdown(secs, 'Rest'); }
 
-function startSetTimer(secs, ex, setNumber){
+function startSetTimer(ex, setNumber, onStop){
   if('Notification' in window && Notification.permission === 'default'){
     Notification.requestPermission().catch(() => {});
   }
+  if(currentView !== 'session' || currentSessionDate) return;
+  stopRest();
+  timerMode = 'up';
+  timerStarted = Date.now();
+  timerLimit = ex.repHigh * 2;
+  timerOnStop = onStop;
+  timerDoneMessage = ex.name + ' set ' + setNumber + ' reached ' + timerLimit + ' seconds.';
   const label = ex.name + ' · S' + setNumber;
-  startCountdown(secs, label, ex.name + ' set ' + setNumber + ' is done.');
+  $timerLabel.textContent = label;
+  $timerHint.textContent = 'tap to stop';
+  document.body.classList.add('resting');
+  $restbar.classList.remove('hidden');
+  $restbar.classList.remove('done');
+  timerInt = setInterval(tickTimer, 250);
+  tickTimer();
 }
 
 function notifyTimerDone(message){
@@ -769,28 +786,55 @@ function notifyTimerDone(message){
   }
 }
 
-function tickRest(){
-  const left = Math.ceil((restEnd - Date.now()) / 1000);
-  if(left <= 0){
-    $restTime.textContent = 'Go!';
-    $restbar.classList.add('done');
-    clearInterval(restInt); restInt = null;
-    if(timerDoneMessage){
+function recordTimedSet(secs){
+  const onStop = timerOnStop;
+  timerOnStop = null;
+  if(onStop) onStop(secs);
+}
+
+function tickTimer(){
+  if(timerMode === 'up'){
+    const elapsed = Math.min(timerLimit, Math.floor((Date.now() - timerStarted) / 1000));
+    $restTime.textContent = formatTimer(elapsed);
+    if(elapsed >= timerLimit){
+      clearInterval(timerInt); timerInt = null;
+      recordTimedSet(timerLimit);
+      timerMode = 'done';
+      $timerHint.textContent = 'tap to dismiss';
+      $restbar.classList.add('done');
       const message = timerDoneMessage;
       timerDoneMessage = null;
       notifyTimerDone(message);
-    }else if(navigator.vibrate){
+    }
+    return;
+  }
+
+  const left = Math.ceil((timerEnd - Date.now()) / 1000);
+  if(left <= 0){
+    $restTime.textContent = 'Go!';
+    $restbar.classList.add('done');
+    $timerHint.textContent = 'tap to dismiss';
+    clearInterval(timerInt); timerInt = null;
+    timerMode = 'done';
+    if(navigator.vibrate){
       navigator.vibrate([200, 100, 200]);
     }
   }else{
-    $restTime.textContent = Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0');
+    $restTime.textContent = formatTimer(left);
   }
 }
 
 function stopRest(){
-  clearInterval(restInt); restInt = null;
+  if(timerMode === 'up' && timerOnStop){
+    const elapsed = Math.min(timerLimit, Math.max(1, Math.floor((Date.now() - timerStarted) / 1000)));
+    recordTimedSet(elapsed);
+  }
+  clearInterval(timerInt); timerInt = null;
+  timerMode = null;
   timerDoneMessage = null;
+  timerOnStop = null;
   $restbar.classList.add('hidden');
+  $restbar.classList.remove('done');
   document.body.classList.remove('resting');
 }
 $restbar.onclick = stopRest;
@@ -1091,15 +1135,11 @@ function exerciseCard(day, ex, ws){
     if(unit === 'sec' && !currentSessionDate){
       const timer = el('button','settimer','▶ Start timer');
       timer.onclick = () => {
-        if(state.reps[i] == null){
-          state.reps[i] = pre.reps[i] != null ? pre.reps[i] : ex.repLow;
-          paintRep(i); commit();
-        }
-        if(state.reps[i] <= 0){
-          showBanner('Set the timer above 0 seconds first.', true);
-          return;
-        }
-        startSetTimer(state.reps[i], ex, i + 1);
+        startSetTimer(ex, i + 1, elapsed => {
+          state.reps[i] = elapsed;
+          paintRep(i);
+          commit();
+        });
       };
       cell.appendChild(timer);
     }

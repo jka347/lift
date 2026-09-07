@@ -89,7 +89,7 @@ Notes:
    - Name, target `sets × repLow–repHigh`
    - **Last session line: weight × reps from most recent session containing this exercise** (e.g., "45 lb — 10/9/8/8")
    - Weight input (prefilled with last weight, with a subtle one-decimal kg conversion beneath lb) + one rep input per set. Rep inputs start visibly empty so they cannot be mistaken for completed work; the first `+` tap fills that set's suggested starting value (normally its reps from the last workout), and later taps increment it. Steppers or number pads; must be thumb-friendly.
-   - Exercises measured in seconds show a small per-set Start Timer button. It uses that set's entered duration, displays the countdown, and signals completion in-app plus vibration and an Android notification when permission is available. Adjusting seconds does not start the normal rest timer.
+   - Exercises measured in seconds show a small per-set Start Timer button. Their timer counts up from zero; tapping the timer bar stops it and records the elapsed seconds. It automatically caps at `2 × repHigh`, records the cap, and signals completion in-app plus vibration and an Android notification when permission is available. Adjusting seconds does not start the normal rest timer.
    - **Progression flag:** if last session hit `repHigh` on ALL sets → show "⬆ Add weight" badge and prefill the next owned weight near the exercise's optional `increment` (default +5 lb). This applies to both rep- and seconds-based exercises.
    - A "done" state per exercise; session auto-saves per entry (writes queued/debounced ~10s to limit API calls).
 3. **Settings:** PAT entry, gist status, units, "Export JSON" (download current data), raw program JSON editor (textarea + validate + save).
