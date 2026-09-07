@@ -17,6 +17,7 @@ Single-user workout tracker PWA. One user (Jeff), phone + PC, no server.
 - **Form guides are program data**: `form: { how, cues[] }` per exercise in the gist JSON, back-filled into pre-existing gists by `ensureFormGuides()` (matched by day id + exercise id).
 - **Rest timer defaults live in code, overrides in data**: auto rest countdown on rep taps / Log — `ex.rest` seconds if set (priority slots get 150 in the default program), else 60 for superset lifts, 90 otherwise. `ensureFormGuides()` also back-fills missing `rest` fields. No timer while editing a past session.
 - **Weights are a ladder, not an increment**: Jeff's equipment is `settings.weights` in the gist (free weights 5/10/12 + adjustable set with 2.5s only inside each 10-lb block, editable in Settings). Weight steppers move to the next/prev owned weight. Default progression uses one owned step below 20 lb and +5 snapped up from 20 lb; an exercise's optional `increment` targets the closest available owned weight above the current load (`2.5` for `latraise`, `reardelt`, `ohp`, and `seatpress`). `ensureFormGuides()` back-fills the ladder and versioned program changes. Never suggest an unowned weight.
+- **Manual progression**: exercises with `progression: "manual"` retain prior load/reps without automatic weight increases or progression badges. Kneeling ab-wheel rollouts stay at 0 lb and progress reps, then reach; reach distance is recorded separately from the tracker.
 
 ## Git
 

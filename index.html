@@ -195,7 +195,7 @@ const DEFAULT_WEIGHTS = [0, 5, 10, 12, 15, 17.5, 20, 25, 27.5, 30, 35, 37.5, 40,
   45, 47.5, 50, 55, 57.5, 60, 65, 67.5, 70, 75, 77.5, 80, 85, 87.5, 90];
 
 const DEFAULT_DATA = {
-  version: 4,
+  version: 5,
   updated_at: null,
   settings: { units: 'lb', weights: DEFAULT_WEIGHTS },
   program: { days: [
@@ -225,7 +225,7 @@ const DEFAULT_DATA = {
       { id:'kbswing',  startWeight:20, name:'KB Swings',         sets:3, repLow:20, repHigh:50, increment:15 },
       { id:'calf',     startWeight:0,  name:'Supported Single-Leg Calf Raise', sets:2, repLow:10, repHigh:20, perSide:true, rest:90 },
       { id:'wsitup',   startWeight:10, name:'Weighted Sit-Ups',  sets:3, repLow:10, repHigh:15 },
-      { id:'legraise', startWeight:0,  name:'Bench Leg Raises',  sets:3, repLow:10, repHigh:15 }
+      { id:'abrollout', startWeight:0, name:'Kneeling Ab-Wheel Rollout', sets:2, repLow:6, repHigh:12, rest:90, progression:'manual' }
     ]},
     { id:'lowerB', name:'Lower + Core B', exercises:[
       { id:'rdlheavy',  startWeight:50, name:'RDL (heavy)',            sets:4, repLow:6,  repHigh:8 },
@@ -263,6 +263,7 @@ const FORM_GUIDE = (() => {
     kbswing: { how:'Feet a bit wider than shoulders. Hinge (hips back, soft knees), hike the bell between your legs, then snap the hips forward — the bell floats to chest height from hip power.', cues:['It’s a hinge, not a squat — shins stay near vertical','Arms are ropes; the hips are the engine','Flat back; brace at the top like a standing plank'] },
     wsitup: { how:'Knees bent, feet anchored, dumbbell held against your chest. Sit up under control, lower slowly. Treat it like a lift.', cues:['Slow lowering — that’s where the growth is','Weight on the chest, not behind the head','When 15 gets easy, add weight, not reps'] },
     legraise: { how:'Lie on the bench, hands gripping behind your head or under hips. Raise legs to vertical, then lower slowly to just below bench level.', cues:['Lower back stays pressed down; shorten the range if it arches','Slow down, controlled up; add ankle weight to progress'] },
+    abrollout: { how:'Kneel on a comfortable surface with the wheel under your shoulders. Squeeze your glutes, keep ribs down, and roll forward only as far as you can without your lower back sagging. Pull back under control. Use a wall to set a repeatable stopping point.', cues:['Start with a short reach and 2 sets of 6-12 controlled reps; rest about 90 seconds','End the reach before your lower back sags; shorten it if you cannot control the return','Build to 12 clean reps on both sets at the same reach, then move slightly farther from the wall and build reps again','Keep the logged weight at 0 lb; progress reach, not external weight','Measure or mark your knee-to-wall distance and record it separately so each session is comparable'] },
     hipthrust: { how:'Upper back on the bench edge, feet flat, dumbbell across your hips (towel under it). Drive through heels to lift hips level, squeeze glutes hard, lower with control.', cues:['Chin tucked, ribs down — finish with glutes, not a low-back arch','Shins roughly vertical at the top; adjust foot distance'] },
     ohcarry: { how:'Press one kettlebell overhead and lock the arm out. Keep the shoulder packed, ribs down, and torso tall while walking or marching for the prescribed time; switch sides as shown in the superset order.', cues:['One implement at a time — never pair an overhead load with a suitcase load','Biceps stays near the ear; wrist stacked over shoulder','No leaning or rib flare; shorten the trip when alignment slips'] },
     twist: { how:'Seated, leaning back slightly, knees bent (heels down = easier). Hold the KB at your chest and rotate the torso side to side under control.', cues:['Rotate from the torso, not the arms','Slow beats fast; touching the floor is optional'] },
@@ -340,6 +341,20 @@ function ensureFormGuides(){
       day.exercises.splice(anchor >= 0 ? anchor + 1 : day.exercises.length, 0, calf);
     }
     data.version = 4;
+    changed = true;
+  }
+
+  // v5 swaps Lower A leg raises for rollouts; saved session entries keep their IDs.
+  if(data.version < 5){
+    const day = data.program.days.find(d => d.id === 'lowerA');
+    if(day){
+      const index = day.exercises.findIndex(e => e.id === 'legraise');
+      if(index >= 0 && !day.exercises.some(e => e.id === 'abrollout')){
+        const replacement = DEFAULT_DATA.program.days.find(d => d.id === 'lowerA').exercises.find(e => e.id === 'abrollout');
+        day.exercises.splice(index, 1, JSON.parse(JSON.stringify(replacement)));
+      }
+    }
+    data.version = 5;
     changed = true;
   }
 
@@ -668,7 +683,7 @@ function computePrefill(ex, excludeSession){
   if(!last){
     return { weight: ex.startWeight, reps: Array(ex.sets).fill(null), progressed: false, last: null };
   }
-  const progressed = last.reps.length >= ex.sets && Math.min(...last.reps) >= ex.repHigh;
+  const progressed = ex.progression !== 'manual' && last.reps.length >= ex.sets && Math.min(...last.reps) >= ex.repHigh;
   if(progressed){
     return { weight: progressWeight(last.weight, ex.increment), reps: Array(ex.sets).fill(ex.repLow), progressed: true, last };
   }
@@ -867,7 +882,7 @@ function renderOverview(){
       const weight = el('div','ovweight');
       if(last){
         weight.innerHTML = esc(last.weight) + ' <small>' + esc(data.settings.units) + '</small>';
-        const progressed = last.reps.length >= ex.sets && Math.min(...last.reps) >= ex.repHigh;
+        const progressed = ex.progression !== 'manual' && last.reps.length >= ex.sets && Math.min(...last.reps) >= ex.repHigh;
         if(progressed) weight.appendChild(el('span','next','⬆ ' + progressWeight(last.weight, ex.increment) + ' next'));
       }else{
         weight.className = 'ovweight start';

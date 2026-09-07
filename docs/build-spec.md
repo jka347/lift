@@ -20,7 +20,7 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
 ## Data model (the gist JSON)
 ```json
 {
-  "version": 4,
+  "version": 5,
   "updated_at": "2026-08-16T15:04:05Z",
   "settings": { "units": "lb" },
   "program": {
@@ -55,7 +55,7 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
           { "id": "kbswing", "startWeight": 20, "name": "KB Swings",              "sets": 3, "repLow": 20, "repHigh": 50, "increment": 15 },
           { "id": "calf", "startWeight": 0, "name": "Supported Single-Leg Calf Raise", "sets": 2, "repLow": 10, "repHigh": 20, "perSide": true, "rest": 90 },
           { "id": "wsitup", "startWeight": 10,  "name": "Weighted Sit-Ups",       "sets": 3, "repLow": 10, "repHigh": 15 },
-          { "id": "legraise", "startWeight": 0,"name": "Bench Leg Raises",       "sets": 3, "repLow": 10, "repHigh": 15 }
+          { "id": "abrollout", "startWeight": 0, "name": "Kneeling Ab-Wheel Rollout", "sets": 2, "repLow": 6, "repHigh": 12, "rest": 90, "progression": "manual" }
       ]},
       { "id": "lowerB", "name": "Lower + Core B", "exercises": [
           { "id": "rdlheavy", "startWeight": 50,"name": "RDL (heavy)",            "sets": 4, "repLow": 6,  "repHigh": 8 },
@@ -98,6 +98,7 @@ Notes:
 - For each exercise, find the most recent session entry.
 - The same lift shares history across routine days when its normalized name, rep range, unit, and per-side mode match, even if each day uses a different exercise ID or number of sets. A different rep range remains a separate progression track.
 - If `min(reps) >= repHigh` → progression triggered: badge + suggest the next owned weight near `increment` (default 5 lb). Small isolation lifts use `increment: 2.5`; timed carries use the same progression logic.
+- `progression: "manual"` keeps the last weight and rep suggestions without an automatic weight increase or badge. Rollouts use this mode: log 0 lb, build to 2 x 12 at a repeatable wall-limited reach, then increase reach slightly and build reps again. Measure or mark knee-to-wall distance and record it separately; the tracker logs reps, not reach distance.
 - Otherwise → prefill the same weight; keep reps visibly empty and use the last reps as each set's first-`+` suggestion.
 - **First exercise ever (no history) → prefill `startWeight`** from the program data; no badge.
 - No streak tracking, no charts in v1. (Nice-to-have later: per-exercise history list.)
@@ -132,7 +133,7 @@ Derived from actual recent working loads (home + travel sessions) and conservati
 | Overhead Carry | 20 | The available KB; shoulder stability without the TGU learning curve or kneeling transition |
 | KB Russian Twists | 20 | The KB you own |
 | Weighted Sit-Ups (DB on chest) | 10 | Ab loading should start light and progress like a lift |
-| Bench Leg Raises | 0 | Bodyweight; add ankle weight/DB between feet later |
+| Kneeling Ab-Wheel Rollout | 0 | Replaces Lower A leg raises, 2 x 6-12. Start with a short wall-limited reach; progress controlled reps, then reach. Keep glutes squeezed and ribs down; stop before the lower back sags. No automatic load progression. Existing leg-raise session entries remain unchanged under their original ID. |
 | Suitcase Carry (single DB) | 45 | 25 confirmed useless; heavy is the exercise |
 
 ## UX requirements
