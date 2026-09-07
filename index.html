@@ -195,7 +195,7 @@ const DEFAULT_WEIGHTS = [0, 5, 10, 12, 15, 17.5, 20, 25, 27.5, 30, 35, 37.5, 40,
   45, 47.5, 50, 55, 57.5, 60, 65, 67.5, 70, 75, 77.5, 80, 85, 87.5, 90];
 
 const DEFAULT_DATA = {
-  version: 5,
+  version: 6,
   updated_at: null,
   settings: { units: 'lb', weights: DEFAULT_WEIGHTS },
   program: { days: [
@@ -220,8 +220,8 @@ const DEFAULT_DATA = {
       { id:'skull',     startWeight:15, name:'Skull Crushers',       sets:3, repLow:8,  repHigh:12, superset:'ss3' }
     ]},
     { id:'lowerA', name:'Lower + Core', exercises:[
-      { id:'rdl',      startWeight:45, name:'Romanian Deadlift', sets:4, repLow:8,  repHigh:10 },
-      { id:'goblet',   startWeight:45, name:'Goblet Squat',      sets:3, repLow:10, repHigh:12 },
+      { id:'goblet',   startWeight:45, name:'Goblet Squat',      sets:4, repLow:6,  repHigh:10, rest:150 },
+      { id:'rdl',      startWeight:45, name:'Romanian Deadlift', sets:3, repLow:8,  repHigh:10 },
       { id:'kbswing',  startWeight:20, name:'KB Swings',         sets:3, repLow:20, repHigh:50, increment:15 },
       { id:'calf',     startWeight:0,  name:'Supported Single-Leg Calf Raise', sets:2, repLow:10, repHigh:20, perSide:true, rest:90 },
       { id:'wsitup',   startWeight:10, name:'Weighted Sit-Ups',  sets:3, repLow:10, repHigh:15 },
@@ -355,6 +355,22 @@ function ensureFormGuides(){
       }
     }
     data.version = 5;
+    changed = true;
+  }
+
+  // v6 makes Lower A squat-first while retaining three RDL sets and saved history.
+  if(data.version < 6){
+    const day = data.program.days.find(d => d.id === 'lowerA');
+    if(day){
+      const squat = day.exercises.find(e => e.id === 'goblet');
+      const rdl = day.exercises.find(e => e.id === 'rdl');
+      if(squat && rdl){
+        Object.assign(squat, { sets:4, repLow:6, repHigh:10, rest:150 });
+        rdl.sets = 3;
+        day.exercises = [squat, rdl, ...day.exercises.filter(e => e !== squat && e !== rdl)];
+      }
+    }
+    data.version = 6;
     changed = true;
   }
 

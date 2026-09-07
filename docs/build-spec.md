@@ -20,7 +20,7 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
 ## Data model (the gist JSON)
 ```json
 {
-  "version": 5,
+  "version": 6,
   "updated_at": "2026-08-16T15:04:05Z",
   "settings": { "units": "lb" },
   "program": {
@@ -50,8 +50,8 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
           { "id": "skull", "startWeight": 15,    "name": "Skull Crushers",        "sets": 3, "repLow": 8,  "repHigh": 12, "superset": "ss3" }
       ]},
       { "id": "lowerA", "name": "Lower + Core", "exercises": [
-          { "id": "rdl", "startWeight": 45,     "name": "Romanian Deadlift",      "sets": 4, "repLow": 8,  "repHigh": 10 },
-          { "id": "goblet", "startWeight": 45,  "name": "Goblet Squat",           "sets": 3, "repLow": 10, "repHigh": 12 },
+          { "id": "goblet", "startWeight": 45,  "name": "Goblet Squat",           "sets": 4, "repLow": 6,  "repHigh": 10, "rest": 150 },
+          { "id": "rdl", "startWeight": 45,     "name": "Romanian Deadlift",      "sets": 3, "repLow": 8,  "repHigh": 10 },
           { "id": "kbswing", "startWeight": 20, "name": "KB Swings",              "sets": 3, "repLow": 20, "repHigh": 50, "increment": 15 },
           { "id": "calf", "startWeight": 0, "name": "Supported Single-Leg Calf Raise", "sets": 2, "repLow": 10, "repHigh": 20, "perSide": true, "rest": 90 },
           { "id": "wsitup", "startWeight": 10,  "name": "Weighted Sit-Ups",       "sets": 3, "repLow": 10, "repHigh": 15 },
@@ -124,9 +124,9 @@ Derived from actual recent working loads (home + travel sessions) and conservati
 | Hammer Curls | 25 | Matches curls; can climb faster |
 | Skull Crushers (per hand) | 15 | New movement, elbows need adaptation — start humble |
 | Overhead Triceps Ext (single DB) | 25 | Current working weight |
-| RDL (8–10) | 45/hand | 40/hand was held back for caution; hinge has headroom |
+| RDL (3 x 8–10) | 45/hand | Lower A secondary lift after squats; retain three sets. Starting load unchanged; use logged performance to progress. |
 | RDL heavy (6–8) | 50/hand | Strength slot, small step above |
-| Goblet Squat (single DB) | 45 | 48 proven; knee-first, tempo before load |
+| Goblet Squat (single DB, 4 x 6–10) | 45 | Lower A first lift; 150-second rest. Starting load unchanged; build load with the heavier adjustable while preserving comfortable depth and controlled reps. |
 | Supported Single-Leg Calf Raise (both lower days) | 0 | Start with bodyweight; 2 x 10-20 per side on each lower day. Use a solid support, controlled full range, and no bouncing. Add one owned dumbbell when both sets reach 20 clean reps on both sides; log external load only. |
 | Hip Thrust (single DB on hips) | 50 | Glutes are strong; this feels light fast — climb quickly |
 | KB Swings | 20 | Conditioning/power slot; build to 3×50, then use a 35 lb bell or one-arm swings rather than a nominal +5 lb adjustment |
