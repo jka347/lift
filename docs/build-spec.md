@@ -20,7 +20,7 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
 ## Data model (the gist JSON)
 ```json
 {
-  "version": 6,
+  "version": 7,
   "updated_at": "2026-08-16T15:04:05Z",
   "settings": { "units": "lb" },
   "program": {
@@ -61,7 +61,7 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
           { "id": "rdlheavy", "startWeight": 50,"name": "RDL (heavy)",            "sets": 4, "repLow": 6,  "repHigh": 8 },
           { "id": "hipthrust", "startWeight": 50,"name": "Hip Thrust",            "sets": 3, "repLow": 10, "repHigh": 12 },
           { "id": "calf", "startWeight": 0, "name": "Supported Single-Leg Calf Raise", "sets": 2, "repLow": 10, "repHigh": 20, "perSide": true, "rest": 90 },
-          { "id": "ohcarry", "startWeight": 20, "name": "Overhead Carry",         "sets": 3, "repLow": 30, "repHigh": 45, "perSide": true, "unit": "sec", "superset": "ssC", "supersetNote": "Overhead L → suitcase R → overhead R → suitcase L. One implement at a time; minimal rest between trips." },
+          { "id": "ohcarry", "startWeight": 20, "name": "Overhead Carry",         "sets": 3, "repLow": 30, "repHigh": 60, "perSide": true, "unit": "sec", "superset": "ssC", "supersetNote": "Overhead L → suitcase R → overhead R → suitcase L. One implement at a time; minimal rest between trips." },
           { "id": "twist", "startWeight": 20,   "name": "KB Russian Twists",      "sets": 3, "repLow": 12, "repHigh": 16 },
           { "id": "carry", "startWeight": 45,   "name": "Suitcase Carry (heavy)", "sets": 3, "repLow": 30, "repHigh": 45, "perSide": true, "unit": "sec", "superset": "ssC" }
       ]}

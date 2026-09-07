@@ -195,7 +195,7 @@ const DEFAULT_WEIGHTS = [0, 5, 10, 12, 15, 17.5, 20, 25, 27.5, 30, 35, 37.5, 40,
   45, 47.5, 50, 55, 57.5, 60, 65, 67.5, 70, 75, 77.5, 80, 85, 87.5, 90];
 
 const DEFAULT_DATA = {
-  version: 6,
+  version: 7,
   updated_at: null,
   settings: { units: 'lb', weights: DEFAULT_WEIGHTS },
   program: { days: [
@@ -231,7 +231,7 @@ const DEFAULT_DATA = {
       { id:'rdlheavy',  startWeight:50, name:'RDL (heavy)',            sets:4, repLow:6,  repHigh:8 },
       { id:'hipthrust', startWeight:50, name:'Hip Thrust',             sets:3, repLow:10, repHigh:12 },
       { id:'calf',      startWeight:0,  name:'Supported Single-Leg Calf Raise', sets:2, repLow:10, repHigh:20, perSide:true, rest:90 },
-      { id:'ohcarry',   startWeight:20, name:'Overhead Carry',         sets:3, repLow:30, repHigh:45, perSide:true, unit:'sec', superset:'ssC',
+      { id:'ohcarry',   startWeight:20, name:'Overhead Carry',         sets:3, repLow:30, repHigh:60, perSide:true, unit:'sec', superset:'ssC',
         supersetNote:'Overhead L → suitcase R → overhead R → suitcase L. One implement at a time; minimal rest between trips.' },
       { id:'twist',     startWeight:20, name:'KB Russian Twists',      sets:3, repLow:12, repHigh:16 },
       { id:'carry',     startWeight:45, name:'Suitcase Carry (heavy)', sets:3, repLow:30, repHigh:45, perSide:true, unit:'sec', superset:'ssC' }
@@ -371,6 +371,15 @@ function ensureFormGuides(){
       }
     }
     data.version = 6;
+    changed = true;
+  }
+
+  // v7 extends the Overhead Carry target and stopwatch cap to 60/120 seconds.
+  if(data.version < 7){
+    const day = data.program.days.find(d => d.id === 'lowerB');
+    const overhead = day && day.exercises.find(e => e.id === 'ohcarry');
+    if(overhead){ overhead.repLow = 30; overhead.repHigh = 60; }
+    data.version = 7;
     changed = true;
   }
 
