@@ -20,7 +20,7 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
 ## Data model (the gist JSON)
 ```json
 {
-  "version": 3,
+  "version": 4,
   "updated_at": "2026-08-16T15:04:05Z",
   "settings": { "units": "lb" },
   "program": {
@@ -53,12 +53,14 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
           { "id": "rdl", "startWeight": 45,     "name": "Romanian Deadlift",      "sets": 4, "repLow": 8,  "repHigh": 10 },
           { "id": "goblet", "startWeight": 45,  "name": "Goblet Squat",           "sets": 3, "repLow": 10, "repHigh": 12 },
           { "id": "kbswing", "startWeight": 20, "name": "KB Swings",              "sets": 3, "repLow": 20, "repHigh": 50, "increment": 15 },
+          { "id": "calf", "startWeight": 0, "name": "Supported Single-Leg Calf Raise", "sets": 2, "repLow": 10, "repHigh": 20, "perSide": true, "rest": 90 },
           { "id": "wsitup", "startWeight": 10,  "name": "Weighted Sit-Ups",       "sets": 3, "repLow": 10, "repHigh": 15 },
           { "id": "legraise", "startWeight": 0,"name": "Bench Leg Raises",       "sets": 3, "repLow": 10, "repHigh": 15 }
       ]},
       { "id": "lowerB", "name": "Lower + Core B", "exercises": [
           { "id": "rdlheavy", "startWeight": 50,"name": "RDL (heavy)",            "sets": 4, "repLow": 6,  "repHigh": 8 },
           { "id": "hipthrust", "startWeight": 50,"name": "Hip Thrust",            "sets": 3, "repLow": 10, "repHigh": 12 },
+          { "id": "calf", "startWeight": 0, "name": "Supported Single-Leg Calf Raise", "sets": 2, "repLow": 10, "repHigh": 20, "perSide": true, "rest": 90 },
           { "id": "ohcarry", "startWeight": 20, "name": "Overhead Carry",         "sets": 3, "repLow": 30, "repHigh": 45, "perSide": true, "unit": "sec", "superset": "ssC", "supersetNote": "Overhead L → suitcase R → overhead R → suitcase L. One implement at a time; minimal rest between trips." },
           { "id": "twist", "startWeight": 20,   "name": "KB Russian Twists",      "sets": 3, "repLow": 12, "repHigh": 16 },
           { "id": "carry", "startWeight": 45,   "name": "Suitcase Carry (heavy)", "sets": 3, "repLow": 30, "repHigh": 45, "perSide": true, "unit": "sec", "superset": "ssC" }
@@ -124,6 +126,7 @@ Derived from actual recent working loads (home + travel sessions) and conservati
 | RDL (8–10) | 45/hand | 40/hand was held back for caution; hinge has headroom |
 | RDL heavy (6–8) | 50/hand | Strength slot, small step above |
 | Goblet Squat (single DB) | 45 | 48 proven; knee-first, tempo before load |
+| Supported Single-Leg Calf Raise (both lower days) | 0 | Start with bodyweight; 2 x 10-20 per side on each lower day. Use a solid support, controlled full range, and no bouncing. Add one owned dumbbell when both sets reach 20 clean reps on both sides; log external load only. |
 | Hip Thrust (single DB on hips) | 50 | Glutes are strong; this feels light fast — climb quickly |
 | KB Swings | 20 | Conditioning/power slot; build to 3×50, then use a 35 lb bell or one-arm swings rather than a nominal +5 lb adjustment |
 | Overhead Carry | 20 | The available KB; shoulder stability without the TGU learning curve or kneeling transition |

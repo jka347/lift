@@ -195,7 +195,7 @@ const DEFAULT_WEIGHTS = [0, 5, 10, 12, 15, 17.5, 20, 25, 27.5, 30, 35, 37.5, 40,
   45, 47.5, 50, 55, 57.5, 60, 65, 67.5, 70, 75, 77.5, 80, 85, 87.5, 90];
 
 const DEFAULT_DATA = {
-  version: 3,
+  version: 4,
   updated_at: null,
   settings: { units: 'lb', weights: DEFAULT_WEIGHTS },
   program: { days: [
@@ -223,12 +223,14 @@ const DEFAULT_DATA = {
       { id:'rdl',      startWeight:45, name:'Romanian Deadlift', sets:4, repLow:8,  repHigh:10 },
       { id:'goblet',   startWeight:45, name:'Goblet Squat',      sets:3, repLow:10, repHigh:12 },
       { id:'kbswing',  startWeight:20, name:'KB Swings',         sets:3, repLow:20, repHigh:50, increment:15 },
+      { id:'calf',     startWeight:0,  name:'Supported Single-Leg Calf Raise', sets:2, repLow:10, repHigh:20, perSide:true, rest:90 },
       { id:'wsitup',   startWeight:10, name:'Weighted Sit-Ups',  sets:3, repLow:10, repHigh:15 },
       { id:'legraise', startWeight:0,  name:'Bench Leg Raises',  sets:3, repLow:10, repHigh:15 }
     ]},
     { id:'lowerB', name:'Lower + Core B', exercises:[
       { id:'rdlheavy',  startWeight:50, name:'RDL (heavy)',            sets:4, repLow:6,  repHigh:8 },
       { id:'hipthrust', startWeight:50, name:'Hip Thrust',             sets:3, repLow:10, repHigh:12 },
+      { id:'calf',      startWeight:0,  name:'Supported Single-Leg Calf Raise', sets:2, repLow:10, repHigh:20, perSide:true, rest:90 },
       { id:'ohcarry',   startWeight:20, name:'Overhead Carry',         sets:3, repLow:30, repHigh:45, perSide:true, unit:'sec', superset:'ssC',
         supersetNote:'Overhead L → suitcase R → overhead R → suitcase L. One implement at a time; minimal rest between trips.' },
       { id:'twist',     startWeight:20, name:'KB Russian Twists',      sets:3, repLow:12, repHigh:16 },
@@ -248,6 +250,7 @@ const FORM_GUIDE = (() => {
   const rdl = { how:'Dumbbell in each hand in front of your thighs, feet hip-width, soft knees. Push hips backward (not down), weights sliding close to your legs to a mid-shin hamstring stretch. Drive hips forward, squeeze glutes.', cues:['Hip movement, not a squat — knees stay fixed','Keep the dumbbells close; drifting forward strains the low back','Back flat, never rounded — if it rounds, stop higher'] };
   return {
     bench, bench2: bench, ohp: press, seatpress: press, row, rowheavy: row, curl, curl2: curl, rdl, rdlheavy: rdl,
+    calf: { how:'Stand on one foot with one hand on a solid support. Keep the working knee straight without forcing it locked. Rise onto the ball of the foot, pause, then lower slowly through a comfortable full range. Start on the floor; a stable step can allow a deeper heel drop. Switch legs.', cues:['Use support for balance, not to pull yourself up; no bouncing','Start with bodyweight (log 0 lb); add one dumbbell when needed and log only its weight','Use the weaker side to set reps and match on the other side; add weight after both sets reach 20 clean reps per side','Rest as needed between sides, then about 90 seconds before the next round'] },
     incline: { how:'Bench propped to ~30–45°. Press from upper-chest level to extended over your upper chest, lowering with control to a deep stretch.', cues:['Elbows ~45° from torso, wrists stacked','Don’t go too steep — that turns it into a shoulder press'] },
     latraise: { how:'Dumbbells at your sides, slight elbow bend. Raise out to the sides to shoulder height, leading with the elbows, then lower slowly.', cues:['Go light — the most over-loaded, worst-performed lift in the gym','No swinging or shrugging; pinkies slightly up at the top','The slow lowering is half the exercise'] },
     triext: { how:'Both hands cupping one dumbbell overhead. Lower it behind your head bending only at the elbows; extend back up. The bottom stretch is the point.', cues:['Elbows point forward, tucked near the ears — no flaring','Only the forearms move'] },
@@ -323,6 +326,20 @@ function ensureFormGuides(){
       }
     }
     data.version = 3;
+    changed = true;
+  }
+
+  // v4 adds a small calf dose to both lower days without replacing user edits.
+  if(data.version < 4){
+    for(const dayId of ['lowerA', 'lowerB']){
+      const day = data.program.days.find(d => d.id === dayId);
+      const defDay = DEFAULT_DATA.program.days.find(d => d.id === dayId);
+      if(!day || day.exercises.some(e => e.id === 'calf')) continue;
+      const calf = JSON.parse(JSON.stringify(defDay.exercises.find(e => e.id === 'calf')));
+      const anchor = day.exercises.findIndex(e => e.id === (dayId === 'lowerA' ? 'kbswing' : 'hipthrust'));
+      day.exercises.splice(anchor >= 0 ? anchor + 1 : day.exercises.length, 0, calf);
+    }
+    data.version = 4;
     changed = true;
   }
 
