@@ -1,7 +1,7 @@
 // Lift service worker — offline shell.
 // Shell: stale-while-revalidate (instant load, picks up new deploys on next visit).
 // Data (api.github.com) is cross-origin and never touched here: always network.
-const CACHE = 'lift-shell-v2';
+const CACHE = 'lift-shell-v3';
 const ASSETS = ['./', 'index.html', 'manifest.json', 'icon-512.png'];
 
 self.addEventListener('install', e => {

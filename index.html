@@ -46,6 +46,22 @@
   .overviewbtn{display:block; width:100%; text-align:center; background:none; border:1px dashed var(--line);
     color:var(--dim); border-radius:16px; padding:14px; font-size:15px; cursor:pointer; margin-top:4px;}
   .overviewbtn:active{background:var(--card);}
+  .bodyprompt{display:flex; align-items:center; gap:4px; margin-bottom:14px; padding:4px 4px 4px 12px;
+    border:1px solid var(--accent-dim); border-radius:12px; background:var(--accent-dim); font-size:14px;}
+  .bodyprompt .message{flex:1; min-width:0; line-height:1.35;}
+  .bodyprompt button{border:0; background:none; color:var(--accent); cursor:pointer;
+    min-width:44px; min-height:44px; padding:8px; font:inherit; font-weight:600;}
+  .bodyprompt .dismiss{color:var(--dim); font-size:21px;}
+  .bodyfields{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px;}
+  .bodyfields .field{min-width:0; margin-bottom:6px;}
+  .bodyfield input{width:100%; min-width:0; background:var(--card2); color:var(--text);
+    border:1px solid var(--line); border-radius:10px; padding:12px; font:inherit; min-height:48px;}
+  .bodyfield small{display:block; color:var(--dim); font-size:12px; line-height:1.4; margin-top:6px;}
+  .bodydetails{margin:16px 0;}
+  .bodydetails summary{cursor:pointer; padding:12px 0; color:var(--text); font-weight:600;}
+  .bodyhistory{width:100%; text-align:left; font:inherit; cursor:pointer; color:var(--text);}
+  .bodyhistory .status{display:block; margin-top:6px; overflow-wrap:anywhere;}
+  .bodyactions{display:flex; flex-wrap:wrap; gap:10px;}
 
   /* Overview */
   .ovrow{display:flex; justify-content:space-between; align-items:center; gap:10px; background:var(--card);
@@ -237,7 +253,8 @@ const DEFAULT_DATA = {
       { id:'carry',     startWeight:45, name:'Suitcase Carry (heavy)', sets:3, repLow:30, repHigh:45, perSide:true, unit:'sec', superset:'ssC' }
     ]}
   ]},
-  sessions: []
+  sessions: [],
+  bodyMetrics: []
 };
 
 // Form guide (from the program PDF), keyed by exercise id and merged into the
@@ -457,13 +474,14 @@ const store = {
 };
 
 let data = null;
-let currentView = 'home';   // 'home' | 'session' | 'overview' | 'settings' | 'setup'
+let currentView = 'home';   // 'home' | 'session' | 'overview' | 'body' | 'settings' | 'setup'
 let currentDayId = null;
 let currentSessionDate = null; // null = today; a date = editing that past session
 let navigationReady = false;
 let saveTimer = null;
 let offline = false;
 let syncing = false;
+let bodyDraft = null;
 
 /* ============ small utils ============ */
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -481,6 +499,185 @@ function el(tag, cls, text){
   if(cls) n.className = cls;
   if(text != null) n.textContent = text;
   return n;
+}
+
+/* ============ body tracking ============ */
+const BODY_FIELDS = [
+  { key:'weightLb', label:'Weight', unit:'lb', hint:'Same scale, morning after the bathroom, before food or drink; similar clothing.' },
+  { key:'waistIn', label:'Waist', unit:'in', core:true, hint:'Just above the hip bones. Relax your belly and read after a normal exhale.' },
+  { key:'chestIn', label:'Chest', unit:'in', core:true, hint:'Around nipple level, tape horizontal, arms relaxed; normal exhale.' },
+  { key:'armIn', label:'Right upper arm', unit:'in', core:true, hint:'Relaxed, not flexed. Midpoint between shoulder and elbow; mark the spot.' },
+  { key:'thighIn', label:'Right thigh', unit:'in', core:true, hint:'Midpoint between groin crease and top of kneecap. Mark the spot; leg relaxed.' },
+  { key:'hipsIn', label:'Hips', unit:'in', hint:'Optional: around the widest part of your buttocks, feet together.' },
+  { key:'calfIn', label:'Right calf', unit:'in', hint:'Optional: around the widest part, standing with weight evenly distributed.' }
+];
+function bodyRows(){ return Array.isArray(data && data.bodyMetrics) ? data.bodyMetrics : []; }
+function validBodyDate(date){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+  const d = new Date(date + 'T12:00:00Z');
+  return Number.isFinite(d.getTime()) && d.toISOString().slice(0,10) === date;
+}
+function nextBodyDate(date, monthly){
+  const [y,m,d] = date.split('-').map(Number);
+  // UTC calendar arithmetic avoids DST; inputs and comparisons are local date strings.
+  const next = monthly
+    ? new Date(Date.UTC(y, m, Math.min(d, new Date(Date.UTC(y, m+1, 0)).getUTCDate())))
+    : new Date(Date.UTC(y, m-1, d+7));
+  return next.toISOString().slice(0,10);
+}
+function lastBodyValue(key, before, inclusive = true){
+  return bodyRows().filter(r => validBodyDate(r.date) && (inclusive ? r.date <= before : r.date < before)
+    && Number.isFinite(r[key]) && r[key] > 0).sort((a,b) => b.date.localeCompare(a.date))[0] || null;
+}
+function bodyDue(today = todayStr()){
+  const lastWeight = lastBodyValue('weightLb', today);
+  const weightDate = lastWeight ? nextBodyDate(lastWeight.date, false) : today;
+  const measurementDate = BODY_FIELDS.filter(f => f.core).map(f => {
+    const last = lastBodyValue(f.key, today);
+    return last ? nextBodyDate(last.date, true) : today;
+  }).sort()[0];
+  return { weightDate, measurementDate, weight:weightDate <= today, measurements:measurementDate <= today };
+}
+function validateBodyEntry(date, values, today = todayStr()){
+  if(!validBodyDate(date) || date > today) return 'Choose a real date no later than today.';
+  let count = 0;
+  for(const f of BODY_FIELDS){
+    const raw = String(values[f.key] ?? '').trim();
+    if(!raw) continue;
+    if(!/^\d+(\.\d+)?$/.test(raw) || !Number.isFinite(Number(raw)) || Number(raw) <= 0)
+      return f.label + ': enter a positive number in ' + f.unit + '.';
+    count++;
+  }
+  return count ? null : 'Enter at least one weight or measurement.';
+}
+function saveBodyEntry(date, values){
+  const error = validateBodyEntry(date, values);
+  if(error) return error;
+  const rows = bodyRows();
+  const previous = rows.find(r => r.date === date);
+  const entry = { ...previous, date };
+  for(const f of BODY_FIELDS){
+    const raw = String(values[f.key] ?? '').trim();
+    if(raw) entry[f.key] = Number(raw); else delete entry[f.key];
+  }
+  data.bodyMetrics = [...rows.filter(r => r.date !== date), entry].sort((a,b) => a.date.localeCompare(b.date));
+  scheduleSave();
+  return null;
+}
+function bodyDateLabel(date){
+  return new Date(date + 'T12:00:00').toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+}
+function bodyReminderVisible(today = todayStr()){
+  const due = bodyDue(today);
+  return (due.weight || due.measurements) && localStorage.getItem('lift_bodyReminderDismissedOn') !== today;
+}
+function dismissBodyReminder(today = todayStr()){
+  localStorage.setItem('lift_bodyReminderDismissedOn',today);
+}
+function renderBodyPrompt(){
+  if(!bodyReminderVisible()) return;
+  const due = bodyDue();
+  const banner = el('div','bodyprompt'); banner.setAttribute('role','region'); banner.setAttribute('aria-label','Body check-in reminder');
+  banner.appendChild(el('span','message',due.weight && due.measurements ? 'Weight + measurements due' : due.weight ? 'Weekly weight due' : 'Monthly measurements due'));
+  const log = el('button',null,'Log'); log.setAttribute('aria-label','Log body check-in'); log.onclick = () => go('body');
+  const dismiss = el('button','dismiss','×'); dismiss.setAttribute('aria-label','Dismiss body reminder for today'); dismiss.title = 'Dismiss for today';
+  dismiss.onclick = () => { dismissBodyReminder(); banner.remove(); };
+  banner.append(log,dismiss); $view.appendChild(banner);
+}
+function renderBodyTracking(){
+  $title.textContent = 'Body tracking';
+  if(!data){ $view.appendChild(el('p','note','Loading…')); return; }
+  const date = currentSessionDate || todayStr();
+  const existing = bodyRows().find(r => r.date === date);
+  if(!bodyDraft || bodyDraft.date !== date){
+    bodyDraft = { date, baseline:JSON.stringify(existing || null), values:Object.fromEntries(BODY_FIELDS.map(f => [f.key, existing && existing[f.key] != null ? String(existing[f.key]) : ''])) };
+  }
+  const due = bodyDue();
+  $view.appendChild(el('p','note','Weekly weight · Monthly waist, chest, arm and thigh. Hips and calf are optional. Reminders appear here when you open Lift.'));
+  $view.appendChild(el('p','note',(due.weight ? 'Weight is due.' : 'Weight next: ' + bodyDateLabel(due.weightDate) + '.') + ' ' +
+    (due.measurements ? 'Measurements are due.' : 'Measurements next: ' + bodyDateLabel(due.measurementDate) + '.')));
+  const form = el('form','card');
+  form.noValidate = true;
+  const dateField = el('div','field bodyfield');
+  const dateLabel = el('label',null,'Check-in date'); dateLabel.htmlFor = 'body-date';
+  const dateInput = el('input'); dateInput.id = 'body-date'; dateInput.type = 'date'; dateInput.max = todayStr(); dateInput.value = date;
+  dateField.append(dateLabel,dateInput); form.appendChild(dateField);
+  const inputs = {};
+  function field(f){
+    const box = el('div','field bodyfield');
+    const label = el('label',null,f.label + ' (' + f.unit + ')'); label.htmlFor = 'body-' + f.key;
+    const input = el('input'); input.id = label.htmlFor; input.type = 'text'; input.inputMode = 'decimal'; input.autocomplete = 'off';
+    input.value = bodyDraft.values[f.key];
+    const last = lastBodyValue(f.key,date,false);
+    input.placeholder = last ? String(last[f.key]) : '—';
+    input.oninput = () => { bodyDraft.values[f.key] = input.value; };
+    inputs[f.key] = input;
+    const hint = el('small',null,f.hint + (last ? ' Previous: ' + last[f.key] + ' ' + f.unit + ' (' + bodyDateLabel(last.date) + ').' : ''));
+    hint.id = input.id + '-hint'; input.setAttribute('aria-describedby',hint.id);
+    box.append(label,input,hint); return box;
+  }
+  form.appendChild(field(BODY_FIELDS[0]));
+  const monthly = el('details','bodydetails'); monthly.open = due.measurements || BODY_FIELDS.some(f => f.unit === 'in' && bodyDraft.values[f.key]);
+  monthly.appendChild(el('summary',null,'Monthly measurements (inches)'));
+  monthly.appendChild(el('p','note','Measure before exercise, with the tape snug but not pressing into skin. Use the same landmarks and posture. Take two readings; repeat if they differ noticeably.'));
+  const core = el('div','bodyfields');
+  BODY_FIELDS.filter(f => f.core).forEach(f => core.appendChild(field(f))); monthly.appendChild(core);
+  const optional = el('details','bodydetails'); optional.open = BODY_FIELDS.some(f => !f.core && f.unit === 'in' && bodyDraft.values[f.key]);
+  optional.appendChild(el('summary',null,'Optional: hips and calf'));
+  const extra = el('div','bodyfields'); BODY_FIELDS.filter(f => !f.core && f.unit === 'in').forEach(f => extra.appendChild(field(f)));
+  optional.appendChild(extra); monthly.appendChild(optional); form.appendChild(monthly);
+  const err = el('p','err'); err.setAttribute('role','status'); err.setAttribute('aria-live','polite');
+  const actions = el('div','bodyactions');
+  const save = el('button','btn',existing ? 'Save changes' : 'Save check-in'); save.type = 'submit'; actions.appendChild(save);
+  if(existing){
+    const remove = el('button','btn secondary','Delete check-in'); remove.type = 'button';
+    remove.onclick = () => {
+      if(JSON.stringify(bodyRows().find(r => r.date === date) || null) !== bodyDraft.baseline){
+        err.textContent = 'This date changed during sync. Reopen it from history before deleting.'; return;
+      }
+      if(!window.confirm('Delete the body check-in for ' + bodyDateLabel(date) + '?')) return;
+      data.bodyMetrics = bodyRows().filter(r => r.date !== date); scheduleSave(); bodyDraft = null; render();
+      showBanner('Check-in deleted.');
+    };
+    actions.appendChild(remove);
+  }
+  dateInput.onchange = () => {
+    if(!validBodyDate(dateInput.value) || dateInput.value > todayStr()){err.textContent = 'Choose a real date no later than today.'; return;}
+    const changed = BODY_FIELDS.some(f => bodyDraft.values[f.key] !== String(existing && existing[f.key] != null ? existing[f.key] : ''));
+    if(changed && !window.confirm('Discard unsaved values and open another date?')){dateInput.value = date;return;}
+    bodyDraft = null; go('body',null,dateInput.value,{replace:true});
+  };
+  form.onsubmit = event => {
+    event.preventDefault();
+    if(dateInput.value !== date){err.textContent = 'Choose a valid check-in date first.'; return;}
+    if(JSON.stringify(bodyRows().find(r => r.date === date) || null) !== bodyDraft.baseline){
+      err.textContent = 'This date changed during sync. Reopen it from history before editing.'; return;
+    }
+    const error = saveBodyEntry(date,Object.fromEntries(BODY_FIELDS.map(f => [f.key,inputs[f.key].value])));
+    if(error){err.textContent = error;return;}
+    bodyDraft = null; render(); showBanner('Check-in saved on this device.');
+  };
+  form.append(actions,err); $view.appendChild(form);
+  $view.appendChild(el('h2',null,'History'));
+  $view.appendChild(el('p','note','Changes compare with the previous recorded value for each measurement. Tape measurements include fat and muscle; small differences can be measurement noise. Tap a date to edit.'));
+  const history = [...bodyRows()].sort((a,b) => b.date.localeCompare(a.date));
+  if(!history.length) $view.appendChild(el('p','note','No check-ins yet. Save your first weight or measurements above.'));
+  for(const row of history){
+    const item = el('button','card bodyhistory'); item.type = 'button';
+    item.appendChild(el('strong',null,bodyDateLabel(row.date)));
+    for(const f of BODY_FIELDS){
+      if(!Number.isFinite(row[f.key])) continue;
+      const previous = lastBodyValue(f.key,row.date,false);
+      const delta = previous ? Math.round((row[f.key]-previous[f.key])*100)/100 : null;
+      item.appendChild(el('span','status',f.label + ': ' + row[f.key] + ' ' + f.unit + (delta == null ? '' : ' (' + (delta > 0 ? '+' : '') + delta + ' since ' + bodyDateLabel(previous.date) + ')')));
+    }
+    item.onclick = () => {
+      const changed = BODY_FIELDS.some(f => bodyDraft.values[f.key] !== String(existing && existing[f.key] != null ? existing[f.key] : ''));
+      if(changed && !window.confirm('Discard unsaved values and open this check-in?')) return;
+      bodyDraft = null; go('body',null,row.date,{replace:true});
+    };
+    $view.appendChild(item);
+  }
 }
 
 /* ============ GitHub gist API ============ */
@@ -563,6 +760,7 @@ async function flushSave(){
       const choice = await askConflict();
       if(choice === 'reload'){
         data = remote;
+        bodyDraft = null;
         store.baseline = remote.updated_at;
         store.dirty = false;
         persistLocal();
@@ -607,6 +805,7 @@ async function hydrate(){
       const choice = await askConflict();
       if(choice === 'reload'){
         data = remote;
+        bodyDraft = null;
         store.baseline = remote.updated_at;
         store.dirty = false;
         persistLocal();
@@ -913,6 +1112,7 @@ function render(){
   else if(currentView === 'session') renderSession();
   else if(currentView === 'settings') renderSettings();
   else if(currentView === 'overview') renderOverview();
+  else if(currentView === 'body') renderBodyTracking();
   else renderHome();
   updateSyncDot();
 }
@@ -921,6 +1121,7 @@ function render(){
 function renderHome(){
   $title.textContent = 'Lift';
   if(!data){ $view.appendChild(el('p','note','Loading…')); return; }
+  renderBodyPrompt();
   for(const day of data.program.days){
     const b = el('button','daybtn');
     b.appendChild(document.createTextNode(day.name));
@@ -932,6 +1133,9 @@ function renderHome(){
   const ov = el('button','overviewbtn','Current weights →');
   ov.onclick = () => go('overview');
   $view.appendChild(ov);
+  const body = el('button','overviewbtn','Body tracking →');
+  body.onclick = () => go('body');
+  $view.appendChild(body);
 }
 
 function renderOverview(){
@@ -1412,7 +1616,10 @@ function renderSetupError(){
 
 window.addEventListener('online', () => { offline = false; updateSyncDot(); flushSave(); });
 window.addEventListener('offline', () => { offline = true; updateSyncDot(); });
-document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flushSave(); });
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'hidden') flushSave();
+  else if(currentView === 'home') render();
+});
 
 init();
 </script>

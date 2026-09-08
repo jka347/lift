@@ -75,7 +75,8 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
         { "exerciseId": "bench", "weight": 45, "reps": [10, 9, 8, 8] }
       ]
     }
-  ]
+  ],
+  "bodyMetrics": []
 }
 ```
 Notes:
@@ -83,7 +84,15 @@ Notes:
 - `unit: "sec"` on carries → reps field is seconds.
 - Program is data, not code — editable later without touching JS. A raw-JSON edit screen is sufficient; no program-builder UI needed.
 
-## Screens (3 total, keep it flat)
+## Body tracking
+- Home shows in-app prompts for weight every 7 local calendar days and waist, chest, relaxed right upper arm, and right thigh every calendar month. With no history, prompts are due immediately. A partial measurement entry does not reset reminders for missing core measurements. Hips and right calf are optional.
+- Due reminders appear in a compact banner above the Home workout buttons, with Log and dismiss controls. Dismiss hides the banner until the next local calendar day on that device (`localStorage.lift_bodyReminderDismissedOn`); it never records a measurement or changes its due date. No banner appears when everything is current. A permanent Body tracking link below the workout buttons remains available, with next-due status inside that screen.
+- These are reminders while using Lift, not scheduled background notifications. Returning to Home or foregrounding the home screen refreshes due dates.
+- A Body tracking screen supports dated entries, history, change from the prior recorded value, edits, and deletion. Use explicit Save; new dates have blank fields and prior values only as placeholders. Dates must be real, not in the future; values must be finite positive decimals. A check-in needs at least one value. Missing fields stay missing rather than becoming zero.
+- Additive top-level `bodyMetrics: []` is included in new data and created on first save for existing data, without changing workout program versions or session entries. Each row is `{ date: "YYYY-MM-DD", weightLb?, waistIn?, chestIn?, armIn?, thighIn?, hipsIn?, calfIn? }`. Units are explicitly pounds and inches, independent of lifting settings. One row per date; same-date saves edit that row. Data uses the existing private-Gist sync, offline queue, conflict handling, and JSON export.
+- Weight protocol: same scale, preferably morning after the bathroom and before food/drink, similar clothing. Circumferences: before exercise, consistent posture and landmarks, tape level/snug without compressing skin; measure twice and repeat inconsistent readings. Waist just above hip bones after a normal exhale; chest at nipple level with arms relaxed; right upper arm relaxed at the midpoint between shoulder and elbow; right thigh at a marked midpoint between groin crease and top of kneecap; hips around widest buttocks; right calf at widest point. Measurements reflect fat, muscle, and measurement variation, not isolated muscle gain/loss. No body-fat estimates or diagnostic thresholds.
+
+## Screens (keep it flat)
 1. **Home:** four day buttons (Upper A / Lower / Upper B / Lower B) + "last session" date under each. Tap → Session.
 2. **Session:** exercise list in program order, supersets visually grouped (shared border/label). Each exercise row shows:
    - Name, target `sets × repLow–repHigh`
@@ -93,6 +102,7 @@ Notes:
    - **Progression flag:** if last session hit `repHigh` on ALL sets → show "⬆ Add weight" badge and prefill the next owned weight near the exercise's optional `increment` (default +5 lb). This applies to both rep- and seconds-based exercises.
    - A "done" state per exercise; session auto-saves per entry (writes queued/debounced ~10s to limit API calls).
 3. **Settings:** PAT entry, gist status, units, "Export JSON" (download current data), raw program JSON editor (textarea + validate + save).
+4. **Body tracking:** weight and monthly measurements, due status, and dated editable history. Reachable from Home in one tap; Back returns through the existing app navigation.
 
 ## Double-progression logic (the core feature)
 - For each exercise, find the most recent session entry.
