@@ -20,7 +20,7 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
 ## Data model (the gist JSON)
 ```json
 {
-  "version": 7,
+  "version": 8,
   "updated_at": "2026-08-16T15:04:05Z",
   "settings": { "units": "lb" },
   "program": {
@@ -50,7 +50,7 @@ A single-page workout tracker PWA for one user (Jeff), hosted free on GitHub Pag
           { "id": "skull", "startWeight": 15,    "name": "Skull Crushers",        "sets": 3, "repLow": 8,  "repHigh": 12, "superset": "ss3" }
       ]},
       { "id": "lowerA", "name": "Lower + Core", "exercises": [
-          { "id": "goblet", "startWeight": 45,  "name": "Goblet Squat",           "sets": 4, "repLow": 6,  "repHigh": 10, "rest": 150 },
+          { "id": "gobletheavy", "startWeight": 45, "name": "Goblet Squat (heavy)", "sets": 4, "repLow": 6, "repHigh": 10, "rest": 150 },
           { "id": "rdl", "startWeight": 45,     "name": "Romanian Deadlift",      "sets": 3, "repLow": 8,  "repHigh": 10 },
           { "id": "kbswing", "startWeight": 20, "name": "KB Swings",              "sets": 3, "repLow": 20, "repHigh": 50, "increment": 15 },
           { "id": "calf", "startWeight": 0, "name": "Supported Single-Leg Calf Raise", "sets": 2, "repLow": 10, "repHigh": 20, "perSide": true, "rest": 90 },
@@ -106,7 +106,7 @@ Notes:
 
 ## Double-progression logic (the core feature)
 - For each exercise, find the most recent session entry.
-- The same lift shares history across routine days when its normalized name, rep range, unit, and per-side mode match, even if each day uses a different exercise ID or number of sets. A different rep range remains a separate progression track.
+- The same lift shares history across routine days when its normalized name, set count, rep range, unit, and per-side mode match, even if each day uses a different exercise ID. A different set count or rep range remains a separate progression track.
 - If `min(reps) >= repHigh` → progression triggered: badge + suggest the next owned weight near `increment` (default 5 lb). Small isolation lifts use `increment: 2.5`; timed carries use the same progression logic.
 - `progression: "manual"` keeps the last weight and rep suggestions without an automatic weight increase or badge. Rollouts use this mode: log 0 lb, build to 2 x 12 at a repeatable wall-limited reach, then increase reach slightly and build reps again. Measure or mark knee-to-wall distance and record it separately; the tracker logs reps, not reach distance.
 - Otherwise → prefill the same weight; keep reps visibly empty and use the last reps as each set's first-`+` suggestion.
@@ -136,7 +136,7 @@ Derived from actual recent working loads (home + travel sessions) and conservati
 | Overhead Triceps Ext (single DB) | 25 | Current working weight |
 | RDL (3 x 8–10) | 45/hand | Lower A secondary lift after squats; retain three sets. Starting load unchanged; use logged performance to progress. |
 | RDL heavy (6–8) | 50/hand | Strength slot, small step above |
-| Goblet Squat (single DB, 4 x 6–10) | 45 | Lower A first lift; 150-second rest. Starting load unchanged; build load with the heavier adjustable while preserving comfortable depth and controlled reps. |
+| Goblet Squat heavy (single DB, 4 x 6–10) | 45 | Lower A first lift; 150-second rest. This is a separate progression track from the prior regular 3 x 10–12 Goblet Squat; build load with the heavier adjustable while preserving comfortable depth and controlled reps. |
 | Supported Single-Leg Calf Raise (both lower days) | 0 | Start with bodyweight; 2 x 10-20 per side on each lower day. Use a solid support, controlled full range, and no bouncing. Add one owned dumbbell when both sets reach 20 clean reps on both sides; log external load only. |
 | Hip Thrust (single DB on hips) | 50 | Glutes are strong; this feels light fast — climb quickly |
 | KB Swings | 20 | Conditioning/power slot; build to 3×50, then use a 35 lb bell or one-arm swings rather than a nominal +5 lb adjustment |

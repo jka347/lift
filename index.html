@@ -211,7 +211,7 @@ const DEFAULT_WEIGHTS = [0, 5, 10, 12, 15, 17.5, 20, 25, 27.5, 30, 35, 37.5, 40,
   45, 47.5, 50, 55, 57.5, 60, 65, 67.5, 70, 75, 77.5, 80, 85, 87.5, 90];
 
 const DEFAULT_DATA = {
-  version: 7,
+  version: 8,
   updated_at: null,
   settings: { units: 'lb', weights: DEFAULT_WEIGHTS },
   program: { days: [
@@ -236,7 +236,7 @@ const DEFAULT_DATA = {
       { id:'skull',     startWeight:15, name:'Skull Crushers',       sets:3, repLow:8,  repHigh:12, superset:'ss3' }
     ]},
     { id:'lowerA', name:'Lower + Core', exercises:[
-      { id:'goblet',   startWeight:45, name:'Goblet Squat',      sets:4, repLow:6,  repHigh:10, rest:150 },
+      { id:'gobletheavy', startWeight:45, name:'Goblet Squat (heavy)', sets:4, repLow:6, repHigh:10, rest:150 },
       { id:'rdl',      startWeight:45, name:'Romanian Deadlift', sets:3, repLow:8,  repHigh:10 },
       { id:'kbswing',  startWeight:20, name:'KB Swings',         sets:3, repLow:20, repHigh:50, increment:15 },
       { id:'calf',     startWeight:0,  name:'Supported Single-Leg Calf Raise', sets:2, repLow:10, repHigh:20, perSide:true, rest:90 },
@@ -277,6 +277,7 @@ const FORM_GUIDE = (() => {
     reardelt: { how:'Hinge forward (or chest on the incline bench), light dumbbells hanging. Slight elbow bend; raise out to the sides like spreading wings, lower slow.', cues:['Very light, high reps — momentum ruins it instantly','Lead with the elbows; don’t fully squeeze the blades (keeps it on the delts)'] },
     skull: { how:'Lie on the bench, dumbbells pressed over your chest, palms facing each other. Bending only at the elbows, lower beside your head, then extend back up.', cues:['Upper arms vertical and still; elbows in, not flared','Lower with control — the name is a warning, not a technique'] },
     goblet: { how:'One dumbbell held vertically against your chest. Stance wider than shoulders, toes out ~30°. Sit straight down between your legs, knees out over toes; drive up through heels and midfoot.', cues:['Knees track out over the toes — never caving inward','Chest tall, torso upright','Pain-free depth only; tempo and pauses before load if the knee complains'] },
+    gobletheavy: { how:'One dumbbell held vertically against your chest. Stance wider than shoulders, toes out ~30°. Sit straight down between your legs, knees out over toes; drive up through heels and midfoot.', cues:['Knees track out over the toes — never caving inward','Chest tall, torso upright','Pain-free depth only; tempo and pauses before load if the knee complains'] },
     kbswing: { how:'Feet a bit wider than shoulders. Hinge (hips back, soft knees), hike the bell between your legs, then snap the hips forward — the bell floats to chest height from hip power.', cues:['It’s a hinge, not a squat — shins stay near vertical','Arms are ropes; the hips are the engine','Flat back; brace at the top like a standing plank'] },
     wsitup: { how:'Knees bent, feet anchored, dumbbell held against your chest. Sit up under control, lower slowly. Treat it like a lift.', cues:['Slow lowering — that’s where the growth is','Weight on the chest, not behind the head','When 15 gets easy, add weight, not reps'] },
     legraise: { how:'Lie on the bench, hands gripping behind your head or under hips. Raise legs to vertical, then lower slowly to just below bench level.', cues:['Lower back stays pressed down; shorten the range if it arches','Slow down, controlled up; add ankle weight to progress'] },
@@ -397,6 +398,18 @@ function ensureFormGuides(){
     const overhead = day && day.exercises.find(e => e.id === 'ohcarry');
     if(overhead){ overhead.repLow = 30; overhead.repHigh = 60; }
     data.version = 7;
+    changed = true;
+  }
+
+  // v8 separates the new heavy Goblet Squat from prior regular-squat history.
+  if(data.version < 8){
+    const day = data.program.days.find(d => d.id === 'lowerA');
+    const squat = day && day.exercises.find(e => e.id === 'goblet');
+    if(squat && squat.sets === 4 && squat.repLow === 6 && squat.repHigh === 10){
+      squat.id = 'gobletheavy';
+      squat.name = 'Goblet Squat (heavy)';
+    }
+    data.version = 8;
     changed = true;
   }
 
@@ -856,6 +869,7 @@ function ensureWorkingSession(dayId, date){
 function sameHistoryLift(a, b){
   const name = ex => String(ex.name || '').trim().replace(/\s+/g, ' ').toLowerCase();
   return name(a) === name(b)
+    && a.sets === b.sets
     && a.repLow === b.repLow
     && a.repHigh === b.repHigh
     && (a.unit || 'reps') === (b.unit || 'reps')
