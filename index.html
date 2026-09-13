@@ -211,7 +211,7 @@ const DEFAULT_WEIGHTS = [0, 5, 10, 12, 15, 17.5, 20, 25, 27.5, 30, 35, 37.5, 40,
   45, 47.5, 50, 55, 57.5, 60, 65, 67.5, 70, 75, 77.5, 80, 85, 87.5, 90];
 
 const DEFAULT_DATA = {
-  version: 8,
+  version: 9,
   updated_at: null,
   settings: { units: 'lb', weights: DEFAULT_WEIGHTS },
   program: { days: [
@@ -247,10 +247,9 @@ const DEFAULT_DATA = {
       { id:'rdlheavy',  startWeight:50, name:'RDL (heavy)',            sets:4, repLow:6,  repHigh:8 },
       { id:'hipthrust', startWeight:50, name:'Hip Thrust',             sets:3, repLow:10, repHigh:12 },
       { id:'calf',      startWeight:0,  name:'Supported Single-Leg Calf Raise', sets:2, repLow:10, repHigh:20, perSide:true, rest:90 },
-      { id:'ohcarry',   startWeight:20, name:'Overhead Carry',         sets:3, repLow:30, repHigh:60, perSide:true, unit:'sec', superset:'ssC',
-        supersetNote:'Overhead L → suitcase R → overhead R → suitcase L. One implement at a time; minimal rest between trips.' },
-      { id:'twist',     startWeight:20, name:'KB Russian Twists',      sets:3, repLow:12, repHigh:16 },
-      { id:'carry',     startWeight:45, name:'Suitcase Carry (heavy)', sets:3, repLow:30, repHigh:45, perSide:true, unit:'sec', superset:'ssC' }
+      { id:'carry',     startWeight:45, name:'Suitcase Carry (heavy)', sets:3, repLow:30, repHigh:45, perSide:true, unit:'sec', superset:'ssC' },
+      { id:'ohcarry',   startWeight:20, name:'Overhead Carry',         sets:3, repLow:30, repHigh:60, perSide:true, unit:'sec', superset:'ssC' },
+      { id:'twist',     startWeight:20, name:'KB Russian Twists',      sets:3, repLow:12, repHigh:16 }
     ]}
   ]},
   sessions: [],
@@ -283,9 +282,9 @@ const FORM_GUIDE = (() => {
     legraise: { how:'Lie on the bench, hands gripping behind your head or under hips. Raise legs to vertical, then lower slowly to just below bench level.', cues:['Lower back stays pressed down; shorten the range if it arches','Slow down, controlled up; add ankle weight to progress'] },
     abrollout: { how:'Kneel on a comfortable surface with the wheel under your shoulders. Squeeze your glutes, keep ribs down, and roll forward only as far as you can without your lower back sagging. Pull back under control. Use a wall to set a repeatable stopping point.', cues:['Start with a short reach and 2 sets of 6-12 controlled reps; rest about 90 seconds','End the reach before your lower back sags; shorten it if you cannot control the return','Build to 12 clean reps on both sets at the same reach, then move slightly farther from the wall and build reps again','Keep the logged weight at 0 lb; progress reach, not external weight','Measure or mark your knee-to-wall distance and record it separately so each session is comparable'] },
     hipthrust: { how:'Upper back on the bench edge, feet flat, dumbbell across your hips (towel under it). Drive through heels to lift hips level, squeeze glutes hard, lower with control.', cues:['Chin tucked, ribs down — finish with glutes, not a low-back arch','Shins roughly vertical at the top; adjust foot distance'] },
-    ohcarry: { how:'Press one kettlebell overhead and lock the arm out. Keep the shoulder packed, ribs down, and torso tall while walking or marching for the prescribed time; switch sides as shown in the superset order.', cues:['One implement at a time — never pair an overhead load with a suitcase load','Biceps stays near the ear; wrist stacked over shoulder','No leaning or rib flare; shorten the trip when alignment slips'] },
+    ohcarry: { how:'Press one kettlebell overhead and lock the arm out. Keep the shoulder packed, ribs down, and torso tall while walking or marching for the prescribed time, then switch sides.', cues:['One implement at a time — never pair an overhead load with a suitcase load','Biceps stays near the ear; wrist stacked over shoulder','No leaning or rib flare; shorten the trip when alignment slips'] },
     twist: { how:'Seated, leaning back slightly, knees bent (heels down = easier). Hold the KB at your chest and rotate the torso side to side under control.', cues:['Rotate from the torso, not the arms','Slow beats fast; touching the floor is optional'] },
-    carry: { how:'One heavy dumbbell at your side, arm straight — a loaded suitcase. Walk or stand dead upright, shoulders level, 30–45 sec per side.', cues:['Go heavy (45+ lb) — light carries do nothing','Don’t lean away from the weight','One implement at a time; follow the carry-pair order shown above the superset'] }
+    carry: { how:'One heavy dumbbell at your side, arm straight — a loaded suitcase. Walk or stand dead upright, shoulders level, 30–45 sec per side.', cues:['Go heavy (45+ lb) — light carries do nothing','Don’t lean away from the weight','Use one implement at a time'] }
   };
 })();
 
@@ -410,6 +409,31 @@ function ensureFormGuides(){
       squat.name = 'Goblet Squat (heavy)';
     }
     data.version = 8;
+    changed = true;
+  }
+
+  // v9 puts Suitcase Carry first and removes the carry-pair sequencing note.
+  if(data.version < 9){
+    const day = data.program.days.find(d => d.id === 'lowerB');
+    if(day){
+      const suitcase = day.exercises.find(e => e.id === 'carry');
+      const overhead = day.exercises.find(e => e.id === 'ohcarry');
+      if(suitcase && overhead){
+        delete suitcase.supersetNote;
+        delete overhead.supersetNote;
+        const oldOverheadHow = 'Press one kettlebell overhead and lock the arm out. Keep the shoulder packed, ribs down, and torso tall while walking or marching for the prescribed time; switch sides as shown in the superset order.';
+        if(overhead.form && overhead.form.how === oldOverheadHow) overhead.form.how = FORM_GUIDE.ohcarry.how;
+        const oldCarryCue = 'One implement at a time; follow the carry-pair order shown above the superset';
+        if(suitcase.form && Array.isArray(suitcase.form.cues)){
+          suitcase.form.cues = suitcase.form.cues.map(cue => cue === oldCarryCue ? 'Use one implement at a time' : cue);
+        }
+        const first = Math.min(day.exercises.indexOf(suitcase), day.exercises.indexOf(overhead));
+        const others = day.exercises.filter(e => e !== suitcase && e !== overhead);
+        others.splice(first, 0, suitcase, overhead);
+        day.exercises = others;
+      }
+    }
+    data.version = 9;
     changed = true;
   }
 
